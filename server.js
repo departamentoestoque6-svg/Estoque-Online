@@ -1,4 +1,4 @@
-// server.js - VERSÃO FINAL E CORRIGIDA
+// server.js - Versão com a funcionalidade de DELETAR
 
 require('dotenv').config();
 const express = require('express');
@@ -63,7 +63,6 @@ app.get('/api/estoque', async (req, res) => {
   }
 });
 
-// ROTA QUE ESTAVA FALTANDO:
 app.get('/api/saidas', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM saidas ORDER BY data DESC');
@@ -101,6 +100,25 @@ app.post('/api/estoque', async (req, res) => {
         console.error(err);
         res.status(500).json({ error: err.message });
     }
+});
+
+// NOVA ROTA PARA DELETAR UM ITEM DO ESTOQUE
+app.delete('/api/estoque/:id', async (req, res) => {
+  try {
+    const { id } = req.params; // Pega o ID que vem na URL (ex: /api/estoque/5)
+    const deleteQuery = 'DELETE FROM estoque WHERE id = $1';
+    
+    const result = await pool.query(deleteQuery, [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Item não encontrado para deletar.' });
+    }
+
+    res.status(200).json({ message: 'Item deletado com sucesso!' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 
