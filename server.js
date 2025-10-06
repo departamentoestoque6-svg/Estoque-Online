@@ -1,4 +1,5 @@
-// server.js
+// server.js - VERSÃO FINAL E CORRIGIDA
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -8,7 +9,6 @@ const { Pool } = require('pg');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuração da conexão com o PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -16,7 +16,6 @@ const pool = new Pool({
   }
 });
 
-// Função para criar as tabelas se não existirem
 const createTables = async () => {
   const queryText = `
     CREATE TABLE IF NOT EXISTS estoque (
@@ -49,10 +48,9 @@ const createTables = async () => {
   }
 };
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // Serve o front-end
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- ROTAS DA API ---
 
@@ -65,38 +63,47 @@ app.get('/api/estoque', async (req, res) => {
   }
 });
 
+// ROTA QUE ESTAVA FALTANDO:
+app.get('/api/saidas', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM saidas ORDER BY data DESC');
+    res.json({ data: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/estoque', async (req, res) => {
     const { produto, fornecedor, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
     const totalUnidadesAdicionadas = (pacotes * 5000) + unidadesAvulsas;
-
+    
     try {
-        const selectRes = await pool.query('SELECT * FROM estoque WHERE produto = $1 AND fornecedor = $2', [produto, fornecedor]);
-
-        if (selectRes.rows.length > 0) { // Item existe, vamos atualizar
+        const selectRes = await pool.query('SELECT * FROM estoque WHERE produto = $1 AND (fornecedor = $2 OR (fornecedor IS NULL AND $2 IS NULL))', [produto, fornecedor || null]);
+        
+        if (selectRes.rows.length > 0) {
             const item = selectRes.rows[0];
             const novoTotalUnidades = item.totalunidades + totalUnidadesAdicionadas;
             const novosPacotes = Math.floor(novoTotalUnidades / 5000);
             const novasUnidadesAvulsas = novoTotalUnidades % 5000;
-
+            
             await pool.query(
                 'UPDATE estoque SET pacotes = $1, unidadesavulsas = $2, totalunidades = $3, custoporpacote = $4, estoqueminimo = $5, ultimaentrada = $6 WHERE id = $7',
                 [novosPacotes, novasUnidadesAvulsas, novoTotalUnidades, custoPorPacote, estoqueMinimo, ultimaEntrada, item.id]
             );
-        } else { // Item não existe, vamos inserir
+        } else {
             await pool.query(
                 'INSERT INTO estoque (produto, fornecedor, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, ultimaentrada) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                [produto, fornecedor, pacotes, unidadesAvulsas, totalUnidadesAdicionadas, custoPorPacote, estoqueMinimo, ultimaEntrada]
+                [produto, fornecedor || null, pacotes, unidadesAvulsas, totalUnidadesAdicionadas, custoPorPacote, estoqueMinimo, ultimaEntrada]
             );
         }
-        res.status(201).json({ message: 'Estoque atualizado com sucesso!' });
+        res.status(201).json({ message: 'Estoque atualizado!' });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Adicione aqui as outras rotas (PUT e DELETE de estoque, POST e GET de saidas) adaptadas para 'pool.query'
 
-// Iniciar o servidor
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
   createTables();
