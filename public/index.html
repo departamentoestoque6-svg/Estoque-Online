@@ -1,11 +1,51 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    </head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Profissional de Controle de Estoque</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 1900px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 25px; text-align: center; position: relative; }
+        .header h1 { font-size: 2.2em; font-weight: 300; }
+        .save-status { position: absolute; top: 15px; right: 20px; background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 20px; font-size: 12px; }
+        .content { padding: 30px; }
+        .tabs { display: flex; margin-bottom: 30px; border-bottom: 2px solid #e9ecef; flex-wrap: wrap; gap: 5px; }
+        .tab { padding: 15px 25px; cursor: pointer; background: #f8f9fa; border: none; font-size: 16px; font-weight: 600; color: #666; transition: all 0.3s; border-radius: 8px 8px 0 0; }
+        .tab.active { background: #3498db; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .section { background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid #3498db; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-weight: 600; color: #2c3e50; margin-bottom: 5px; font-size: 14px; }
+        input, select { padding: 10px; border: 2px solid #e9ecef; border-radius: 6px; font-size: 14px; transition: border-color 0.3s; }
+        input:focus, select:focus { outline: none; border-color: #3498db; }
+        .btn { background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+        .btn-success { background: linear-gradient(135deg, #27ae60, #229954); }
+        .btn-danger { background: #e74c3c; }
+        .table-container { overflow-x: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+        th { background: linear-gradient(135deg, #34495e, #2c3e50); color: white; padding: 12px 8px; text-align: left; font-weight: 600; }
+        td { padding: 10px 8px; border-bottom: 1px solid #ecf0f1; }
+        .currency { text-align: right; font-weight: 600; color: #27ae60; }
+        .number { text-align: right; font-weight: 600; }
+        .success-message, .error-message { padding: 12px 15px; border-radius: 6px; margin: 10px 0; display: none; }
+        .success-message { background: #d4edda; color: #155724; border-left: 3px solid #27ae60; }
+        .error-message { background: #f8d7da; color: #721c24; border-left: 3px solid #e74c3c; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 30px; border-radius: 10px; width: 90%; max-width: 600px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
 <body>
     <div class="container">
         <div class="header">
-            </div>
+            <h1>Sistema de Controle de Estoque Online</h1>
+            <div class="save-status" id="saveStatus">Carregando...</div>
+        </div>
         <div class="content">
             <div class="tabs">
                 <button class="tab active" onclick="trocarAba('estoque')">Estoque</button>
@@ -13,34 +53,47 @@
             </div>
             <div class="success-message" id="successMessage"></div>
             <div class="error-message" id="errorMessage"></div>
-            
             <div id="aba-estoque" class="tab-content active">
+                <div class="section">
+                    <h3>Entrada de Estoque</h3>
+                    <div class="form-row">
+                        <div class="form-group"><label for="estoqueProduto">Produto <span style="color: red;">*</span></label><input type="text" id="estoqueProduto" placeholder="Ex: Papel Adesivo"></div>
+                        <div class="form-group"><label for="estoqueFornecedor">Fornecedor</label><input type="text" id="estoqueFornecedor" placeholder="Nome do fornecedor"></div>
+                        <div class="form-group"><label for="estoquePacotes">Pacotes <span style="color: red;">*</span></label><input type="number" id="estoquePacotes" placeholder="0" min="0" value="0"></div>
+                        <div class="form-group"><label for="estoqueUnidades">Unidades Avulsas</label><input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="estoqueCusto">Custo/Pacote (R$) <span style="color: red;">*</span></label><input type="number" step="0.01" id="estoqueCusto" placeholder="45.00" min="0"></div>
+                        <div class="form-group"><label for="estoqueMinimo">Estoque Mínimo (un)</label><input type="number" id="estoqueMinimo" placeholder="5000" min="0"></div>
+                        <div class="form-group"><label for="estoqueData">Data da Compra</label><input type="date" id="estoqueData"></div>
+                    </div>
+                    <button class="btn btn-success" onclick="adicionarEstoque()">Adicionar / Atualizar Estoque</button>
                 </div>
-
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ações</th>
+                                <th>Produto</th>
+                                <th>Fornecedor</th>
+                                <th>Total (un)</th>
+                                <th>Custo/Pacote</th>
+                                <th>Última Entrada</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaEstoque"></tbody>
+                    </table>
+                </div>
+            </div>
             <div id="aba-saida" class="tab-content">
                 <div class="section">
                     <h3>Registrar Saída</h3>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="saidaProduto">Produto <span style="color: red;">*</span></label>
-                            <select id="saidaProduto"></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaData">Data <span style="color: red;">*</span></label>
-                            <input type="date" id="saidaData">
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaPacotes">Pacotes</label>
-                            <input type="number" id="saidaPacotes" value="0" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaUnidades">Unidades</label>
-                            <input type="number" id="saidaUnidades" value="0" min="0">
-                        </div>
-                         <div class="form-group">
-                            <label for="saidaDestino">Destino</label>
-                            <input type="text" id="saidaDestino" placeholder="Cliente, pedido, etc">
-                        </div>
+                        <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto"></select></div>
+                        <div class="form-group"><label for="saidaData">Data <span style="color: red;">*</span></label><input type="date" id="saidaData"></div>
+                        <div class="form-group"><label for="saidaPacotes">Pacotes</label><input type="number" id="saidaPacotes" value="0" min="0"></div>
+                        <div class="form-group"><label for="saidaUnidades">Unidades</label><input type="number" id="saidaUnidades" value="0" min="0"></div>
+                         <div class="form-group"><label for="saidaDestino">Destino</label><input type="text" id="saidaDestino" placeholder="Cliente, pedido, etc"></div>
                     </div>
                     <button class="btn btn-success" onclick="registrarSaida()">Registrar Saída</button>
                 </div>
@@ -62,112 +115,121 @@
             </div>
         </div>
     </div>
-
     <div id="modalEdicao" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h2>Editar Item do Estoque</h2>
+            <input type="hidden" id="editId">
+            <div class="form-row">
+                <div class="form-group"><label>Produto</label><input type="text" id="editProduto" readonly></div>
+                <div class="form-group"><label for="editFornecedor">Fornecedor</label><input type="text" id="editFornecedor"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label for="editPacotes">Pacotes</label><input type="number" id="editPacotes" min="0"></div>
+                <div class="form-group"><label for="editUnidades">Unidades Avulsas</label><input type="number" id="editUnidades" min="0"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label for="editCusto">Custo/Pacote</label><input type="number" step="0.01" id="editCusto" min="0"></div>
+                <div class="form-group"><label for="editMinimo">Estoque Mínimo</label><input type="number" id="editMinimo" min="0"></div>
+            </div>
+            <button class="btn btn-success" onclick="salvarEdicao()">Salvar Alterações</button>
         </div>
-
+    </div>
     <script>
-        // O script será atualizado
         const API_URL = '/api';
         const UN_POR_PACOTE = 5000;
         let estoque = [];
         let saidas = [];
 
         async function carregarDados() {
-            // ... mesma função de antes ...
-        }
-
-        async function adicionarEstoque() {
-            // ... mesma função de antes ...
-        }
-
-        function editarEstoque(index) {
-            // ... mesma função de antes ...
-        }
-        
-        async function salvarEdicao() {
-            // ... mesma função de antes ...
-        }
-        
-        async function excluirEstoque(id) {
-            // ... mesma função de antes ...
-        }
-
-        // FUNÇÃO REGISTRAR SAÍDA ATUALIZADA
-        async function registrarSaida() {
-            const produtoId = parseInt(document.getElementById('saidaProduto').value);
-            const totalUnidades = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0);
-
-            if (!produtoId || !document.getElementById('saidaData').value || totalUnidades === 0) {
-                 return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error');
-            }
-
-            const saida = {
-                data: document.getElementById('saidaData').value,
-                produtoId: produtoId,
-                totalUnidades: totalUnidades,
-                destino: document.getElementById('saidaDestino').value.trim()
-            };
-
+            document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
-                const response = await fetch(`${API_URL}/saidas`, {
+                const [estoqueRes, saidasRes] = await Promise.all([ fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`) ]);
+                if (!estoqueRes.ok || !saidasRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+                const estoqueData = await estoqueRes.json();
+                const saidasData = await saidasRes.json();
+                estoque = estoqueData.data;
+                saidas = saidasData.data;
+                document.getElementById('saveStatus').textContent = 'Pronto';
+                atualizarTodaUI();
+            } catch (error) {
+                document.getElementById('saveStatus').textContent = 'Erro de Conexão';
+                mostrarMensagem(error.message || 'Não foi possível conectar ao servidor.', 'error');
+                console.error('Erro ao carregar dados:', error);
+            }
+        }
+        async function adicionarEstoque() {
+            const novoItem = {
+                produto: document.getElementById('estoqueProduto').value,
+                fornecedor: document.getElementById('estoqueFornecedor').value.trim(),
+                pacotes: parseInt(document.getElementById('estoquePacotes').value) || 0,
+                unidadesAvulsas: parseInt(document.getElementById('estoqueUnidades').value) || 0,
+                custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value),
+                estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
+                ultimaEntrada: document.getElementById('estoqueData').value
+            };
+            if (!novoItem.produto || (!novoItem.pacotes && !novoItem.unidadesAvulsas) || !novoItem.custoPorPacote) {
+                return mostrarMensagem('Preencha os campos obrigatórios!', 'error');
+            }
+            try {
+                const response = await fetch(`${API_URL}/estoque`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(saida)
+                    body: JSON.stringify(novoItem)
                 });
-                
-                const result = await response.json(); // Pega a resposta do servidor
-
-                if (!response.ok) {
-                    throw new Error(result.error || 'Falha ao registrar saída.');
-                }
-                
-                mostrarMensagem('Saída registrada com sucesso!', 'success');
-                limparFormSaida();
-                await carregarDados(); // Recarrega TODOS os dados para atualizar as duas tabelas
+                if (!response.ok) throw new Error('Falha ao adicionar ao estoque.');
+                mostrarMensagem('Estoque atualizado com sucesso!', 'success');
+                limparFormEstoque();
+                await carregarDados();
             } catch (error) {
                 mostrarMensagem(error.message, 'error');
             }
         }
-
-        function atualizarTodaUI() {
-            renderizarEstoque();
-            renderizarSaidas();
-            atualizarProdutosDisponiveis();
+        function editarEstoque(index) {
+            const item = estoque[index];
+            document.getElementById('editId').value = item.id;
+            document.getElementById('editProduto').value = item.produto;
+            document.getElementById('editFornecedor').value = item.fornecedor || '';
+            document.getElementById('editPacotes').value = item.pacotes;
+            document.getElementById('editUnidades').value = item.unidadesavulsas;
+            document.getElementById('editCusto').value = item.custoporpacote;
+            document.getElementById('editMinimo').value = item.estoqueminimo;
+            document.getElementById('modalEdicao').style.display = 'block';
         }
-        
-        function renderizarEstoque() {
-             // ... mesma função de antes ...
+        async function salvarEdicao() {
+            const id = document.getElementById('editId').value;
+            const dadosEditados = {
+                fornecedor: document.getElementById('editFornecedor').value.trim(),
+                pacotes: parseInt(document.getElementById('editPacotes').value) || 0,
+                unidadesavulsas: parseInt(document.getElementById('editUnidades').value) || 0,
+                custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0,
+                estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0
+            };
+            try {
+                const response = await fetch(`${API_URL}/estoque/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dadosEditados)
+                });
+                if (!response.ok) throw new Error('Falha ao salvar as alterações.');
+                mostrarMensagem('Item atualizado com sucesso!', 'success');
+                fecharModal();
+                await carregarDados();
+            } catch (error) {
+                mostrarMensagem(error.message, 'error');
+            }
         }
-
-        function renderizarSaidas() {
-             // ... mesma função de antes ...
+        async function excluirEstoque(id) {
+            if (!confirm('Tem certeza? Esta ação não pode ser desfeita.')) return;
+            try {
+                const response = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Falha ao deletar o item.');
+                mostrarMensagem('Item deletado com sucesso!', 'success');
+                await carregarDados();
+            } catch (error) {
+                mostrarMensagem(error.message, 'error');
+            }
         }
-
-        function atualizarProdutosDisponiveis() {
-            const select = document.getElementById('saidaProduto');
-            select.innerHTML = '<option value="">Selecione...</option>';
-            estoque.forEach(item => {
-                if (item.totalunidades > 0) {
-                    const opt = document.createElement('option');
-                    opt.value = item.id;
-                    opt.textContent = `${item.produto} (Disponível: ${(item.totalunidades || 0).toLocaleString()} un)`;
-                    select.appendChild(opt);
-                }
-            });
-        }
-        
-        // ... resto das funções auxiliares (trocarAba, limparForm, etc.) e o inicializador ...
-        
-        window.trocarAba = trocarAba;
-        window.adicionarEstoque = adicionarEstoque;
-        window.registrarSaida = registrarSaida;
-        window.excluirEstoque = excluirEstoque;
-        window.editarEstoque = editarEstoque;
-        window.salvarEdicao = salvarEdicao;
-        window.fecharModal = fecharModal;
-
-        document.addEventListener('DOMContentLoaded', inicializar);
-    </script>
-</body>
-</html>
+        async function registrarSaida() {
+            const produtoId = parseInt(document.getElementById('saidaProduto').value);
+            const totalUnidades = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_
