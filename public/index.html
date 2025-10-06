@@ -50,10 +50,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Sistema de Controle de Estoque Online</h1>
-            <div class="save-status" id="saveStatus">Carregando...</div>
-        </div>
+        <div class="header"><h1>Sistema de Controle de Estoque Online</h1><div class="save-status" id="saveStatus">Carregando...</div></div>
         <div class="content">
             <div class="tabs">
                 <button class="tab active" onclick="trocarAba('dashboard')">Dashboard</button>
@@ -183,6 +180,45 @@
         let saidas = [];
         let meuGrafico = null;
 
+        function pedirPermissaoDeNotificacao() {
+            if ('Notification' in window) {
+                if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            console.log('Permissão para notificações concedida!');
+                        }
+                    });
+                }
+            }
+        }
+
+        async function verificarAlertas() {
+            console.log('Verificando por alertas de estoque baixo...');
+            try {
+                const response = await fetch(`${API_URL}/alertas/estoque-baixo`);
+                if (!response.ok) return;
+
+                const result = await response.json();
+                const itensEmBaixa = result.data;
+
+                if (itensEmBaixa && itensEmBaixa.length > 0) {
+                    const primeiroItem = itensEmBaixa[0];
+                    const mensagem = itensEmBaixa.length > 1
+                        ? `${primeiroItem.produto} e mais ${itensEmBaixa.length - 1} outro(s) item(ns) estão com estoque baixo.`
+                        : `${primeiroItem.produto} está com estoque baixo (${primeiroItem.totalunidades} restantes).`;
+
+                    if (Notification.permission === 'granted') {
+                        new Notification('⚠️ Alerta de Estoque Baixo!', {
+                            body: mensagem,
+                            icon: 'https://cdn-icons-png.flaticon.com/512/10099/10099719.png'
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao verificar alertas:', error);
+            }
+        }
+
         function ajustarCamposProduto() {
             const select = document.getElementById('estoqueProduto');
             const selectedOption = select.options[select.selectedIndex];
@@ -207,9 +243,7 @@
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
                 const [estoqueRes, saidasRes, statsRes] = await Promise.all([
-                    fetch(`${API_URL}/estoque`),
-                    fetch(`${API_URL}/saidas`),
-                    fetch(`${API_URL}/dashboard/stats`)
+                    fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`), fetch(`${API_URL}/dashboard/stats`)
                 ]);
                 if (!estoqueRes.ok || !saidasRes.ok || !statsRes.ok) throw new Error('Falha ao buscar dados do servidor.');
                 
@@ -238,9 +272,7 @@
 
         function renderizarGrafico(dadosEstoque) {
             const ctx = document.getElementById('graficoEstoque').getContext('2d');
-            if (meuGrafico) {
-                meuGrafico.destroy();
-            }
+            if (meuGrafico) { meuGrafico.destroy(); }
             const top5 = [...dadosEstoque].sort((a, b) => b.totalunidades - a.totalunidades).slice(0, 5);
             const labels = top5.map(item => item.produto);
             const data = top5.map(item => item.totalunidades);
@@ -269,9 +301,7 @@
             let unidadesAvulsas = parseInt(document.getElementById('estoqueUnidades').value) || 0;
             let custo = parseFloat(document.getElementById('estoqueCusto').value);
 
-            if (tipo === 'rolo') {
-                unidadesAvulsas = 0; // Unidades avulsas não se aplicam a rolos na nossa lógica
-            }
+            if (tipo === 'rolo') { unidadesAvulsas = 0; }
             
             const novoItem = {
                 produto: document.getElementById('estoqueProduto').value,
@@ -461,6 +491,9 @@
             document.getElementById('saidaData').value = hoje;
             ajustarCamposProduto();
             carregarDados();
+            pedirPermissaoDeNotificacao();
+            setInterval(verificarAlertas, 60000);
+            verificarAlertas();
         }
         
         window.trocarAba = trocarAba;
