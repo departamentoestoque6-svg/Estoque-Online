@@ -26,6 +26,13 @@
         .btn { background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
         .btn-success { background: linear-gradient(135deg, #27ae60, #229954); }
         .btn-danger { background-color: #e74c3c; }
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 4px solid; }
+        .card-success { border-left-color: #27ae60; }
+        .card-warning { border-left-color: #f39c12; }
+        .card-danger { border-left-color: #e74c3c; }
+        .card h3 { margin: 0 0 10px 0; color: #2c3e50; font-size: 1em; }
+        .card .value { font-size: 1.8em; font-weight: bold; color: #2c3e50; }
         .table-container { overflow-x: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
         th { background: linear-gradient(135deg, #34495e, #2c3e50); color: white; padding: 12px 8px; text-align: left; font-weight: 600; }
@@ -42,18 +49,25 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Sistema de Controle de Estoque Online</h1>
-            <div class="save-status" id="saveStatus">Carregando...</div>
-        </div>
+        <div class="header"><h1>Sistema de Controle de Estoque Online</h1><div class="save-status" id="saveStatus">Carregando...</div></div>
         <div class="content">
             <div class="tabs">
-                <button class="tab active" onclick="trocarAba('estoque')">Estoque</button>
+                <button class="tab active" onclick="trocarAba('dashboard')">Dashboard</button>
+                <button class="tab" onclick="trocarAba('estoque')">Estoque</button>
                 <button class="tab" onclick="trocarAba('saida')">Saída</button>
             </div>
             <div class="success-message" id="successMessage"></div>
             <div class="error-message" id="errorMessage"></div>
-            <div id="aba-estoque" class="tab-content active">
+
+            <div id="aba-dashboard" class="tab-content active">
+                <div class="summary-cards">
+                    <div class="card card-success"><h3>Total em Estoque</h3><div class="value" id="dashTotalEstoque">0 un</div></div>
+                    <div class="card card-warning"><h3>Valor do Estoque</h3><div class="value" id="dashValorEstoque">R$ 0,00</div></div>
+                    <div class="card card-danger"><h3>Itens Críticos</h3><div class="value" id="dashCriticos">0</div></div>
+                </div>
+            </div>
+
+            <div id="aba-estoque" class="tab-content">
                 <div class="section">
                     <h3>Entrada de Estoque</h3>
                     <div class="form-row">
@@ -71,22 +85,14 @@
                 </div>
                 <div class="table-container">
                     <table>
-                        <thead>
-                            <tr>
-                                <th>Ações</th>
-                                <th>Produto</th>
-                                <th>Fornecedor</th>
-                                <th>Total (un)</th>
-                                <th>Custo/Pacote</th>
-                                <th>Última Entrada</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Ações</th><th>Produto</th><th>Fornecedor</th><th>Total (un)</th><th>Custo/Pacote</th><th>Última Entrada</th></tr></thead>
                         <tbody id="tabelaEstoque"></tbody>
                     </table>
                 </div>
             </div>
+            
             <div id="aba-saida" class="tab-content">
-                <div class="section">
+                 <div class="section">
                     <h3>Registrar Saída</h3>
                     <div class="form-row">
                         <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto"></select></div>
@@ -136,19 +142,33 @@
         async function carregarDados() {
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
-                const [estoqueRes, saidasRes] = await Promise.all([ fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`) ]);
-                if (!estoqueRes.ok || !saidasRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+                const [estoqueRes, saidasRes, statsRes] = await Promise.all([
+                    fetch(`${API_URL}/estoque`),
+                    fetch(`${API_URL}/saidas`),
+                    fetch(`${API_URL}/dashboard/stats`)
+                ]);
+                if (!estoqueRes.ok || !saidasRes.ok || !statsRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+                
                 const estoqueData = await estoqueRes.json();
                 const saidasData = await saidasRes.json();
+                const statsData = await statsRes.json();
+
                 estoque = estoqueData.data;
                 saidas = saidasData.data;
+                
                 document.getElementById('saveStatus').textContent = 'Pronto';
+                atualizarDashboard(statsData);
                 atualizarTodaUI();
             } catch (error) {
                 document.getElementById('saveStatus').textContent = 'Erro de Conexão';
                 mostrarMensagem(error.message || 'Não foi possível conectar ao servidor.', 'error');
                 console.error('Erro ao carregar dados:', error);
             }
+        }
+        function atualizarDashboard(stats) {
+            document.getElementById('dashTotalEstoque').textContent = `${parseFloat(stats.totalItens).toLocaleString()} un`;
+            document.getElementById('dashValorEstoque').textContent = formatarMoeda(parseFloat(stats.valorTotal));
+            document.getElementById('dashCriticos').textContent = stats.itensCriticos;
         }
         async function adicionarEstoque() {
             const novoItem = {
@@ -243,7 +263,7 @@
                 tr.innerHTML = `
                     <td>
                         <button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${index})">Editar</button>
-                        <button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button>
+                        <button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer; background-color: #e74c3c;" onclick="excluirEstoque(${item.id})">Excluir</button>
                     </td>
                     <td>${item.produto}</td>
                     <td>${item.fornecedor || '-'}</td>

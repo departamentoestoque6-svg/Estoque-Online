@@ -1,4 +1,4 @@
-// server.js - VERSÃO COMPLETA E FINAL (com todas as funcionalidades e logs de debug)
+// server.js - VERSÃO COMPLETA E FINAL (com Dashboard, Adicionar, Visualizar, Editar e Deletar)
 
 require('dotenv').config();
 const express = require('express');
@@ -57,6 +57,34 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- ROTAS DA API ---
 
+// ROTA PARA AS ESTATÍSTICAS DO DASHBOARD
+app.get('/api/dashboard/stats', async (req, res) => {
+  console.log('>>> ROTA GET /api/dashboard/stats ACESSADA');
+  try {
+    const totalItensQuery = 'SELECT SUM(totalunidades) AS total_itens FROM estoque';
+    const valorTotalQuery = 'SELECT SUM(totalunidades * custoporpacote / 5000) AS valor_total FROM estoque';
+    const itensCriticosQuery = 'SELECT COUNT(*) AS itens_criticos FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
+
+    const [totalItensRes, valorTotalRes, itensCriticosRes] = await Promise.all([
+      pool.query(totalItensQuery),
+      pool.query(valorTotalQuery),
+      pool.query(itensCriticosQuery)
+    ]);
+
+    const stats = {
+      totalItens: totalItensRes.rows[0].total_itens || 0,
+      valorTotal: valorTotalRes.rows[0].valor_total || 0,
+      itensCriticos: itensCriticosRes.rows[0].itens_criticos || 0,
+    };
+    console.log('>>> SUCESSO na busca das estatísticas do dashboard.');
+    res.json(stats);
+  } catch (err) {
+    console.error('!!! ERRO na rota de stats do dashboard:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ROTA PARA BUSCAR TODO O ESTOQUE
 app.get('/api/estoque', async (req, res) => {
   console.log('>>> ROTA GET /api/estoque ACESSADA');
   try {
@@ -69,6 +97,7 @@ app.get('/api/estoque', async (req, res) => {
   }
 });
 
+// ROTA PARA BUSCAR TODAS AS SAÍDAS
 app.get('/api/saidas', async (req, res) => {
   console.log('>>> ROTA GET /api/saidas ACESSADA');
   try {
@@ -81,6 +110,7 @@ app.get('/api/saidas', async (req, res) => {
   }
 });
 
+// ROTA PARA ADICIONAR/ATUALIZAR UM ITEM
 app.post('/api/estoque', async (req, res) => {
     console.log('>>> ROTA POST /api/estoque ACESSADA');
     const { produto, fornecedor, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
@@ -112,6 +142,7 @@ app.post('/api/estoque', async (req, res) => {
     }
 });
 
+// ROTA PARA EDITAR UM ITEM
 app.put('/api/estoque/:id', async (req, res) => {
     console.log(`>>> ROTA PUT /api/estoque/${req.params.id} ACESSADA`);
   try {
@@ -139,6 +170,7 @@ app.put('/api/estoque/:id', async (req, res) => {
   }
 });
 
+// ROTA PARA DELETAR UM ITEM
 app.delete('/api/estoque/:id', async (req, res) => {
     console.log(`>>> ROTA DELETE /api/estoque/${req.params.id} ACESSADA`);
   try {
@@ -158,6 +190,7 @@ app.delete('/api/estoque/:id', async (req, res) => {
   }
 });
 
+// ROTA PARA REGISTRAR UMA SAÍDA
 app.post('/api/saidas', async (req, res) => {
   console.log('>>> ROTA POST /api/saidas ACESSADA');
   const { data, produtoId, totalUnidades, destino } = req.body;
