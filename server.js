@@ -1,4 +1,4 @@
-// server.js - VERSÃO COMPLETA E FINAL (com Adicionar, Visualizar, Editar e Deletar)
+// server.js - VERSÃO COMPLETA E FINAL DE DEBUG (com todas as rotas e logs)
 
 require('dotenv').config();
 const express = require('express');
@@ -53,32 +53,36 @@ const createTables = async () => {
 // Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // Serve o front-end
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- ROTAS DA API ---
 
-// ROTA PARA BUSCAR TODO O ESTOQUE
 app.get('/api/estoque', async (req, res) => {
+  console.log('>>> ROTA GET /api/estoque ACESSADA');
   try {
     const result = await pool.query('SELECT * FROM estoque ORDER BY produto');
+    console.log('>>> SUCESSO na busca do estoque.');
     res.json({ data: result.rows });
   } catch (err) {
+    console.error('!!! ERRO na rota GET /api/estoque:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ROTA PARA BUSCAR TODAS AS SAÍDAS
 app.get('/api/saidas', async (req, res) => {
+  console.log('>>> ROTA GET /api/saidas ACESSADA');
   try {
     const result = await pool.query('SELECT * FROM saidas ORDER BY data DESC');
+    console.log('>>> SUCESSO na busca das saídas.');
     res.json({ data: result.rows });
   } catch (err) {
+    console.error('!!! ERRO na rota GET /api/saidas:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ROTA PARA ADICIONAR/ATUALIZAR UM ITEM
 app.post('/api/estoque', async (req, res) => {
+    console.log('>>> ROTA POST /api/estoque ACESSADA');
     const { produto, fornecedor, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
     const totalUnidadesAdicionadas = (pacotes * 5000) + unidadesAvulsas;
     
@@ -103,13 +107,13 @@ app.post('/api/estoque', async (req, res) => {
         }
         res.status(201).json({ message: 'Estoque atualizado!' });
     } catch (err) {
-        console.error(err);
+        console.error('!!! ERRO na rota POST /api/estoque:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ROTA PARA EDITAR UM ITEM
 app.put('/api/estoque/:id', async (req, res) => {
+    console.log(`>>> ROTA PUT /api/estoque/${req.params.id} ACESSADA`);
   try {
     const { id } = req.params;
     const { fornecedor, pacotes, unidadesavulsas, custoporpacote, estoqueminimo } = req.body;
@@ -130,13 +134,13 @@ app.put('/api/estoque/:id', async (req, res) => {
 
     res.status(200).json({ message: 'Item atualizado com sucesso!' });
   } catch (err) {
-    console.error(err);
+    console.error(`!!! ERRO na rota PUT /api/estoque/${req.params.id}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ROTA PARA DELETAR UM ITEM
 app.delete('/api/estoque/:id', async (req, res) => {
+    console.log(`>>> ROTA DELETE /api/estoque/${req.params.id} ACESSADA`);
   try {
     const { id } = req.params;
     const deleteQuery = 'DELETE FROM estoque WHERE id = $1';
@@ -149,13 +153,13 @@ app.delete('/api/estoque/:id', async (req, res) => {
 
     res.status(200).json({ message: 'Item deletado com sucesso!' });
   } catch (err) {
-    console.error(err);
+    console.error(`!!! ERRO na rota DELETE /api/estoque/${req.params.id}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ROTA PARA REGISTRAR UMA SAÍDA
 app.post('/api/saidas', async (req, res) => {
+  console.log('>>> ROTA POST /api/saidas ACESSADA');
   const { data, produtoId, totalUnidades, destino } = req.body;
   const client = await pool.connect();
 
@@ -193,7 +197,7 @@ app.post('/api/saidas', async (req, res) => {
 
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Erro na transação de saída:', err);
+    console.error('!!! ERRO na rota POST /api/saidas:', err);
     res.status(400).json({ error: err.message });
   } finally {
     client.release();
