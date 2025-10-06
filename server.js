@@ -1,4 +1,4 @@
-// server.js - VERSÃO COMPLETA E FINAL DE DEBUG (com todas as rotas e logs)
+// server.js - VERSÃO COMPLETA E FINAL (com todas as funcionalidades e logs de debug)
 
 require('dotenv').config();
 const express = require('express');
@@ -168,14 +168,10 @@ app.post('/api/saidas', async (req, res) => {
 
     const estoqueRes = await client.query('SELECT * FROM estoque WHERE id = $1 FOR UPDATE', [produtoId]);
 
-    if (estoqueRes.rows.length === 0) {
-      throw new Error('Produto não encontrado no estoque.');
-    }
+    if (estoqueRes.rows.length === 0) { throw new Error('Produto não encontrado no estoque.'); }
     const item = estoqueRes.rows[0];
 
-    if (item.totalunidades < totalUnidades) {
-      throw new Error('Estoque insuficiente para esta saída.');
-    }
+    if (item.totalunidades < totalUnidades) { throw new Error('Estoque insuficiente para esta saída.'); }
 
     const novoTotalUnidades = item.totalunidades - totalUnidades;
     const novosPacotes = Math.floor(novoTotalUnidades / 5000);
