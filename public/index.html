@@ -35,6 +35,9 @@
         .success-message, .error-message { padding: 12px 15px; border-radius: 6px; margin: 10px 0; display: none; }
         .success-message { background: #d4edda; color: #155724; border-left: 3px solid #27ae60; }
         .error-message { background: #f8d7da; color: #721c24; border-left: 3px solid #e74c3c; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 30px; border-radius: 10px; width: 90%; max-width: 600px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -83,26 +86,31 @@
                 </div>
             </div>
             <div id="aba-saida" class="tab-content">
-                <div class="section">
-                    <h3>Registrar Saída</h3>
-                    </div>
-                 <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Produto</th>
-                                <th>Total (un)</th>
-                                <th>Custo Total</th>
-                                <th>Destino</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabelaSaida"></tbody>
-                    </table>
                 </div>
-            </div>
         </div>
     </div>
+
+    <div id="modalEdicao" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h2>Editar Item do Estoque</h2>
+            <input type="hidden" id="editId">
+            <div class="form-row">
+                <div class="form-group"><label>Produto</label><input type="text" id="editProduto" readonly></div>
+                <div class="form-group"><label for="editFornecedor">Fornecedor</label><input type="text" id="editFornecedor"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label for="editPacotes">Pacotes</label><input type="number" id="editPacotes" min="0"></div>
+                <div class="form-group"><label for="editUnidades">Unidades Avulsas</label><input type="number" id="editUnidades" min="0"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label for="editCusto">Custo/Pacote</label><input type="number" step="0.01" id="editCusto" min="0"></div>
+                <div class="form-group"><label for="editMinimo">Estoque Mínimo</label><input type="number" id="editMinimo" min="0"></div>
+            </div>
+            <button class="btn btn-success" onclick="salvarEdicao()">Salvar Alterações</button>
+        </div>
+    </div>
+
     <script>
         const API_URL = '/api';
         const UN_POR_PACOTE = 5000;
@@ -112,10 +120,7 @@
         async function carregarDados() {
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
-                const [estoqueRes, saidasRes] = await Promise.all([
-                    fetch(`${API_URL}/estoque`),
-                    fetch(`${API_URL}/saidas`)
-                ]);
+                const [estoqueRes, saidasRes] = await Promise.all([ fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`) ]);
                 if (!estoqueRes.ok || !saidasRes.ok) throw new Error('Falha ao buscar dados do servidor.');
                 const estoqueData = await estoqueRes.json();
                 const saidasData = await saidasRes.json();
@@ -157,18 +162,48 @@
                 mostrarMensagem(error.message, 'error');
             }
         }
-        
-        async function excluirEstoque(id) {
-            if (!confirm('Tem certeza que deseja excluir este item do estoque? Esta ação não pode ser desfeita.')) {
-                return;
-            }
+
+        function editarEstoque(index) {
+            const item = estoque[index];
+            document.getElementById('editId').value = item.id;
+            document.getElementById('editProduto').value = item.produto;
+            document.getElementById('editFornecedor').value = item.fornecedor || '';
+            document.getElementById('editPacotes').value = item.pacotes;
+            document.getElementById('editUnidades').value = item.unidadesavulsas;
+            document.getElementById('editCusto').value = item.custoporpacote;
+            document.getElementById('editMinimo').value = item.estoqueminimo;
+            document.getElementById('modalEdicao').style.display = 'block';
+        }
+
+        async function salvarEdicao() {
+            const id = document.getElementById('editId').value;
+            const dadosEditados = {
+                fornecedor: document.getElementById('editFornecedor').value.trim(),
+                pacotes: parseInt(document.getElementById('editPacotes').value) || 0,
+                unidadesavulsas: parseInt(document.getElementById('editUnidades').value) || 0,
+                custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0,
+                estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0
+            };
             try {
                 const response = await fetch(`${API_URL}/estoque/${id}`, {
-                    method: 'DELETE'
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dadosEditados)
                 });
-                if (!response.ok) {
-                    throw new Error('Falha ao deletar o item.');
-                }
+                if (!response.ok) throw new Error('Falha ao salvar as alterações.');
+                mostrarMensagem('Item atualizado com sucesso!', 'success');
+                fecharModal();
+                await carregarDados();
+            } catch (error) {
+                mostrarMensagem(error.message, 'error');
+            }
+        }
+        
+        async function excluirEstoque(id) {
+            if (!confirm('Tem certeza? Esta ação não pode ser desfeita.')) return;
+            try {
+                const response = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Falha ao deletar o item.');
                 mostrarMensagem('Item deletado com sucesso!', 'success');
                 await carregarDados();
             } catch (error) {
@@ -182,13 +217,12 @@
 
         function atualizarTodaUI() {
             renderizarEstoque();
-            renderizarSaidas();
-            atualizarProdutosDisponiveis();
+            // renderizarSaidas();
+            // atualizarProdutosDisponiveis();
         }
 
         function trocarAba(aba) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
             document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active');
             document.getElementById(`aba-${aba}`).classList.add('active');
         }
@@ -196,11 +230,12 @@
         function renderizarEstoque() {
             const tbody = document.getElementById('tabelaEstoque');
             tbody.innerHTML = '';
-            estoque.forEach((item) => {
+            estoque.forEach((item, index) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0;" onclick="excluirEstoque(${item.id})">Excluir</button>
+                        <button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer;" onclick="editarEstoque(${index})">Editar</button>
+                        <button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button>
                     </td>
                     <td>${item.produto}</td>
                     <td>${item.fornecedor || '-'}</td>
@@ -211,27 +246,7 @@
                 tbody.appendChild(tr);
             });
         }
-
-        function renderizarSaidas() {
-             const tbody = document.getElementById('tabelaSaida');
-             tbody.innerHTML = '';
-             saidas.forEach(saida => {
-                 const tr = document.createElement('tr');
-                 tr.innerHTML = `
-                    <td>${formatarData(saida.data)}</td>
-                    <td>${saida.produtonome}</td>
-                    <td class="number">${(saida.totalunidades || 0).toLocaleString()}</td>
-                    <td class="currency">${formatarMoeda(saida.custototal)}</td>
-                    <td>${saida.destino || '-'}</td>
-                 `;
-                 tbody.appendChild(tr);
-             });
-        }
-
-        function atualizarProdutosDisponiveis() {
-            // Esta função pode ser reativada quando a aba de saída for implementada
-        }
-
+        
         function limparFormEstoque() {
             document.getElementById('estoqueProduto').value = '';
             document.getElementById('estoqueFornecedor').value = '';
@@ -240,6 +255,10 @@
             document.getElementById('estoqueCusto').value = '';
             document.getElementById('estoqueMinimo').value = '';
             document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0];
+        }
+
+        function fecharModal() {
+            document.getElementById('modalEdicao').style.display = 'none';
         }
 
         function mostrarMensagem(msg, tipo) {
@@ -252,7 +271,6 @@
         }
 
         function formatarMoeda(valor) { return 'R$ ' + (valor || 0).toFixed(2).replace('.', ','); }
-
         function formatarData(data) {
             if (!data) return '';
             if (data.includes('T')) { return data.split('T')[0].split('-').reverse().join('/'); }
@@ -262,7 +280,6 @@
         function inicializar() {
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('estoqueData').value = hoje;
-            // document.getElementById('saidaData').value = hoje; // Desativado por enquanto
             carregarDados();
         }
         
@@ -270,6 +287,9 @@
         window.adicionarEstoque = adicionarEstoque;
         window.registrarSaida = registrarSaida;
         window.excluirEstoque = excluirEstoque;
+        window.editarEstoque = editarEstoque;
+        window.salvarEdicao = salvarEdicao;
+        window.fecharModal = fecharModal;
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>

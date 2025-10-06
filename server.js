@@ -1,4 +1,4 @@
-// server.js - Versão com a funcionalidade de DELETAR
+// server.js - Versão com as funcionalidades DELETAR e EDITAR
 
 require('dotenv').config();
 const express = require('express');
@@ -102,10 +102,38 @@ app.post('/api/estoque', async (req, res) => {
     }
 });
 
-// NOVA ROTA PARA DELETAR UM ITEM DO ESTOQUE
+// NOVA ROTA PARA EDITAR UM ITEM (MÉTODO PUT)
+app.put('/api/estoque/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fornecedor, pacotes, unidadesavulsas, custoporpacote, estoqueminimo } = req.body;
+    
+    // Recalcula o total de unidades com base nos dados recebidos
+    const totalunidades = (pacotes * 5000) + unidadesavulsas;
+
+    const updateQuery = `
+      UPDATE estoque 
+      SET fornecedor = $1, pacotes = $2, unidadesavulsas = $3, totalunidades = $4, custoporpacote = $5, estoqueminimo = $6
+      WHERE id = $7
+    `;
+    
+    const result = await pool.query(updateQuery, [fornecedor, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Item não encontrado para editar.' });
+    }
+
+    res.status(200).json({ message: 'Item atualizado com sucesso!' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 app.delete('/api/estoque/:id', async (req, res) => {
   try {
-    const { id } = req.params; // Pega o ID que vem na URL (ex: /api/estoque/5)
+    const { id } = req.params;
     const deleteQuery = 'DELETE FROM estoque WHERE id = $1';
     
     const result = await pool.query(deleteQuery, [id]);
