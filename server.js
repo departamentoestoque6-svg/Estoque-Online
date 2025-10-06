@@ -1,4 +1,4 @@
-// server.js - VERSÃO COMPLETA E FINAL (com Dashboard, Adicionar, Visualizar, Editar e Deletar)
+// server.js - VERSÃO COMPLETA E FINAL (com rota de alertas)
 
 require('dotenv').config();
 const express = require('express');
@@ -83,6 +83,20 @@ app.get('/api/dashboard/stats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ROTA PARA VERIFICAR ALERTAS DE ESTOQUE BAIXO
+app.get('/api/alertas/estoque-baixo', async (req, res) => {
+  console.log('>>> ROTA GET /api/alertas/estoque-baixo ACESSADA');
+  try {
+    const query = 'SELECT produto, totalunidades, estoqueminimo FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
+    const result = await pool.query(query);
+    res.json({ data: result.rows });
+  } catch (err) {
+    console.error('!!! ERRO na rota de alertas:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ROTA PARA BUSCAR TODO O ESTOQUE
 app.get('/api/estoque', async (req, res) => {

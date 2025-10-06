@@ -270,7 +270,7 @@
             let custo = parseFloat(document.getElementById('estoqueCusto').value);
 
             if (tipo === 'rolo') {
-                unidadesAvulsas = 0;
+                unidadesAvulsas = 0; // Unidades avulsas não se aplicam a rolos na nossa lógica
             }
             
             const novoItem = {
@@ -282,7 +282,9 @@
                 estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
                 ultimaEntrada: document.getElementById('estoqueData').value
             };
-            if (!novoItem.produto || (!novoItem.pacotes && !novoItem.unidadesAvulsas) || !novoItem.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); }
+            if (!novoItem.produto || (tipo === 'cartela' && !novoItem.pacotes && !novoItem.unidadesAvulsas) || (tipo === 'rolo' && !novoItem.pacotes) || !novoItem.custoPorPacote) { 
+                return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); 
+            }
             
             try {
                 const response = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(novoItem) });
@@ -423,7 +425,7 @@
             document.getElementById('estoqueCusto').value = '';
             document.getElementById('estoqueMinimo').value = '';
             document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0];
-            ajustarCamposProduto(); // Reseta o formulário para o estado padrão
+            ajustarCamposProduto();
         }
 
         function limparFormSaida() {
@@ -457,7 +459,7 @@
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('estoqueData').value = hoje;
             document.getElementById('saidaData').value = hoje;
-            ajustarCamposProduto(); // Garante que o form comece no estado correto
+            ajustarCamposProduto();
             carregarDados();
         }
         
