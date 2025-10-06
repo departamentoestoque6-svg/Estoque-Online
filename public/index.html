@@ -6,131 +6,32 @@
     <title>Sistema Profissional de Controle de Estoque</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 1900px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #2c3e50, #3498db);
-            color: white;
-            padding: 25px;
-            text-align: center;
-            position: relative;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 1900px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 25px; text-align: center; position: relative; }
         .header h1 { font-size: 2.2em; font-weight: 300; }
-        .save-status {
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-        }
+        .save-status { position: absolute; top: 15px; right: 20px; background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 20px; font-size: 12px; }
         .content { padding: 30px; }
-        .tabs {
-            display: flex;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #e9ecef;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-        .tab {
-            padding: 15px 25px;
-            cursor: pointer;
-            background: #f8f9fa;
-            border: none;
-            font-size: 16px;
-            font-weight: 600;
-            color: #666;
-            transition: all 0.3s;
-            border-radius: 8px 8px 0 0;
-        }
+        .tabs { display: flex; margin-bottom: 30px; border-bottom: 2px solid #e9ecef; flex-wrap: wrap; gap: 5px; }
+        .tab { padding: 15px 25px; cursor: pointer; background: #f8f9fa; border: none; font-size: 16px; font-weight: 600; color: #666; transition: all 0.3s; border-radius: 8px 8px 0 0; }
         .tab.active { background: #3498db; color: white; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .section {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            border-left: 4px solid #3498db;
-        }
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 15px;
-        }
+        .section { background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid #3498db; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
         .form-group { display: flex; flex-direction: column; }
-        label {
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-        input, select, textarea {
-            padding: 10px;
-            border: 2px solid #e9ecef;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-        .btn {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: transform 0.2s;
-            margin: 10px 5px;
-        }
-        .btn:hover { transform: translateY(-2px); }
+        label { font-weight: 600; color: #2c3e50; margin-bottom: 5px; font-size: 14px; }
+        input, select { padding: 10px; border: 2px solid #e9ecef; border-radius: 6px; font-size: 14px; transition: border-color 0.3s; }
+        input:focus, select:focus { outline: none; border-color: #3498db; }
+        .btn { background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
         .btn-success { background: linear-gradient(135deg, #27ae60, #229954); }
-        .table-container {
-            overflow-x: auto;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            font-size: 13px;
-        }
-        th {
-            background: linear-gradient(135deg, #34495e, #2c3e50);
-            color: white;
-            padding: 12px 8px;
-            text-align: left;
-            font-weight: 600;
-        }
-        td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #ecf0f1;
-        }
+        .table-container { overflow-x: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+        th { background: linear-gradient(135deg, #34495e, #2c3e50); color: white; padding: 12px 8px; text-align: left; font-weight: 600; }
+        td { padding: 10px 8px; border-bottom: 1px solid #ecf0f1; }
         .currency { text-align: right; font-weight: 600; color: #27ae60; }
         .number { text-align: right; font-weight: 600; }
-        .success-message, .error-message {
-            padding: 12px 15px; border-radius: 6px; margin: 10px 0; display: none;
-        }
+        .success-message, .error-message { padding: 12px 15px; border-radius: 6px; margin: 10px 0; display: none; }
         .success-message { background: #d4edda; color: #155724; border-left: 3px solid #27ae60; }
         .error-message { background: #f8d7da; color: #721c24; border-left: 3px solid #e74c3c; }
     </style>
@@ -141,115 +42,57 @@
             <h1>Sistema de Controle de Estoque Online</h1>
             <div class="save-status" id="saveStatus">Carregando...</div>
         </div>
-        
         <div class="content">
             <div class="tabs">
                 <button class="tab active" onclick="trocarAba('estoque')">Estoque</button>
                 <button class="tab" onclick="trocarAba('saida')">Saída</button>
             </div>
-
             <div class="success-message" id="successMessage"></div>
             <div class="error-message" id="errorMessage"></div>
-
             <div id="aba-estoque" class="tab-content active">
                 <div class="section">
                     <h3>Entrada de Estoque</h3>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="estoqueProduto">Produto <span style="color: red;">*</span></label>
-                            <input type="text" id="estoqueProduto" placeholder="Ex: Papel Adesivo">
-                        </div>
-                        <div class="form-group">
-                            <label for="estoqueFornecedor">Fornecedor</label>
-                            <input type="text" id="estoqueFornecedor" placeholder="Nome do fornecedor">
-                        </div>
-                        <div class="form-group">
-                            <label for="estoquePacotes">Pacotes <span style="color: red;">*</span></label>
-                            <input type="number" id="estoquePacotes" placeholder="0" min="0" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="estoqueUnidades">Unidades Avulsas</label>
-                            <input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0">
-                        </div>
+                        <div class="form-group"><label for="estoqueProduto">Produto <span style="color: red;">*</span></label><input type="text" id="estoqueProduto" placeholder="Ex: Papel Adesivo"></div>
+                        <div class="form-group"><label for="estoqueFornecedor">Fornecedor</label><input type="text" id="estoqueFornecedor" placeholder="Nome do fornecedor"></div>
+                        <div class="form-group"><label for="estoquePacotes">Pacotes <span style="color: red;">*</span></label><input type="number" id="estoquePacotes" placeholder="0" min="0" value="0"></div>
+                        <div class="form-group"><label for="estoqueUnidades">Unidades Avulsas</label><input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0"></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="estoqueCusto">Custo/Pacote (R$) <span style="color: red;">*</span></label>
-                            <input type="number" step="0.01" id="estoqueCusto" placeholder="45.00" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="estoqueMinimo">Estoque Mínimo (un)</label>
-                            <input type="number" id="estoqueMinimo" placeholder="5000" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="estoqueData">Data da Compra</label>
-                            <input type="date" id="estoqueData">
-                        </div>
+                        <div class="form-group"><label for="estoqueCusto">Custo/Pacote (R$) <span style="color: red;">*</span></label><input type="number" step="0.01" id="estoqueCusto" placeholder="45.00" min="0"></div>
+                        <div class="form-group"><label for="estoqueMinimo">Estoque Mínimo (un)</label><input type="number" id="estoqueMinimo" placeholder="5000" min="0"></div>
+                        <div class="form-group"><label for="estoqueData">Data da Compra</label><input type="date" id="estoqueData"></div>
                     </div>
                     <button class="btn btn-success" onclick="adicionarEstoque()">Adicionar / Atualizar Estoque</button>
                 </div>
-
                 <div class="table-container">
                     <table>
-                        <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>Fornecedor</th>
-                                <th>Total (un)</th>
-                                <th>Custo/Pacote</th>
-                                <th>Última Entrada</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Produto</th><th>Fornecedor</th><th>Total (un)</th><th>Custo/Pacote</th><th>Última Entrada</th></tr></thead>
                         <tbody id="tabelaEstoque"></tbody>
                     </table>
                 </div>
             </div>
-            
             <div id="aba-saida" class="tab-content">
                 <div class="section">
                     <h3>Registrar Saída</h3>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="saidaProduto">Produto <span style="color: red;">*</span></label>
-                            <select id="saidaProduto"></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaData">Data <span style="color: red;">*</span></label>
-                            <input type="date" id="saidaData">
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaPacotes">Pacotes</label>
-                            <input type="number" id="saidaPacotes" value="0" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="saidaUnidades">Unidades</label>
-                            <input type="number" id="saidaUnidades" value="0" min="0">
-                        </div>
-                         <div class="form-group">
-                            <label for="saidaDestino">Destino</label>
-                            <input type="text" id="saidaDestino" placeholder="Cliente, pedido, etc">
-                        </div>
+                        <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto"></select></div>
+                        <div class="form-group"><label for="saidaData">Data <span style="color: red;">*</span></label><input type="date" id="saidaData"></div>
+                        <div class="form-group"><label for="saidaPacotes">Pacotes</label><input type="number" id="saidaPacotes" value="0" min="0"></div>
+                        <div class="form-group"><label for="saidaUnidades">Unidades</label><input type="number" id="saidaUnidades" value="0" min="0"></div>
+                        <div class="form-group"><label for="saidaDestino">Destino</label><input type="text" id="saidaDestino" placeholder="Cliente, pedido, etc"></div>
                     </div>
                     <button class="btn btn-success" onclick="registrarSaida()">Registrar Saída</button>
                 </div>
                  <div class="table-container">
                     <table>
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Produto</th>
-                                <th>Total (un)</th>
-                                <th>Custo Total</th>
-                                <th>Destino</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino</th></tr></thead>
                         <tbody id="tabelaSaida"></tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
-
     <script>
         const API_URL = '/api';
         const UN_POR_PACOTE = 5000;
@@ -263,25 +106,19 @@
                     fetch(`${API_URL}/estoque`),
                     fetch(`${API_URL}/saidas`)
                 ]);
-
                 if (!estoqueRes.ok || !saidasRes.ok) throw new Error('Falha ao buscar dados do servidor.');
-
                 const estoqueData = await estoqueRes.json();
                 const saidasData = await saidasRes.json();
-                
                 estoque = estoqueData.data;
                 saidas = saidasData.data;
-
                 document.getElementById('saveStatus').textContent = 'Pronto';
-                console.log('Dados carregados do servidor.');
                 atualizarTodaUI();
             } catch (error) {
                 document.getElementById('saveStatus').textContent = 'Erro de Conexão';
-                mostrarMensagem(error.message || 'Não foi possível conectar ao servidor. Verifique os logs e a conexão.', 'error');
+                mostrarMensagem(error.message || 'Não foi possível conectar ao servidor.', 'error');
                 console.error('Erro ao carregar dados:', error);
             }
         }
-
         async function adicionarEstoque() {
             const novoItem = {
                 produto: document.getElementById('estoqueProduto').value,
@@ -292,6 +129,114 @@
                 estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
                 ultimaEntrada: document.getElementById('estoqueData').value
             };
-
             if (!novoItem.produto || (!novoItem.pacotes && !novoItem.unidadesAvulsas) || !novoItem.custoPorPacote) {
-                return mostrarMensagem('Preencha os campos obrigatórios (Produto, Quantidade e Custo)!', 'error');
+                return mostrarMensagem('Preencha os campos obrigatórios!', 'error');
+            }
+            try {
+                const response = await fetch(`${API_URL}/estoque`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(novoItem)
+                });
+                if (!response.ok) throw new Error('Falha ao adicionar ao estoque.');
+                mostrarMensagem('Estoque atualizado com sucesso!', 'success');
+                limparFormEstoque();
+                await carregarDados();
+            } catch (error) {
+                mostrarMensagem(error.message, 'error');
+            }
+        }
+        async function registrarSaida() {
+            mostrarMensagem('Funcionalidade de registrar saída ainda será implementada.', 'error');
+        }
+        function atualizarTodaUI() {
+            renderizarEstoque();
+            renderizarSaidas();
+            atualizarProdutosDisponiveis();
+        }
+        function trocarAba(aba) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active');
+            document.getElementById(`aba-${aba}`).classList.add('active');
+        }
+        function renderizarEstoque() {
+            const tbody = document.getElementById('tabelaEstoque');
+            tbody.innerHTML = '';
+            estoque.forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.produto}</td>
+                    <td>${item.fornecedor || '-'}</td>
+                    <td class="number">${(item.totalunidades || 0).toLocaleString()}</td>
+                    <td class="currency">${formatarMoeda(item.custoporpacote)}</td>
+                    <td>${formatarData(item.ultimaentrada)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        function renderizarSaidas() {
+             const tbody = document.getElementById('tabelaSaida');
+             tbody.innerHTML = '';
+             saidas.forEach(saida => {
+                 const tr = document.createElement('tr');
+                 tr.innerHTML = `
+                    <td>${formatarData(saida.data)}</td>
+                    <td>${saida.produtonome}</td>
+                    <td class="number">${(saida.totalunidades || 0).toLocaleString()}</td>
+                    <td class="currency">${formatarMoeda(saida.custototal)}</td>
+                    <td>${saida.destino || '-'}</td>
+                 `;
+                 tbody.appendChild(tr);
+             });
+        }
+        function atualizarProdutosDisponiveis() {
+            const select = document.getElementById('saidaProduto');
+            select.innerHTML = '<option value="">Selecione...</option>';
+            estoque.forEach(item => {
+                if (item.totalunidades > 0) {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = `${item.produto} (${(item.totalunidades || 0).toLocaleString()} un)`;
+                    select.appendChild(opt);
+                }
+            });
+        }
+        function limparFormEstoque() {
+            document.getElementById('estoqueProduto').value = '';
+            document.getElementById('estoqueFornecedor').value = '';
+            document.getElementById('estoquePacotes').value = '0';
+            document.getElementById('estoqueUnidades').value = '0';
+            document.getElementById('estoqueCusto').value = '';
+            document.getElementById('estoqueMinimo').value = '';
+            document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0];
+        }
+        function mostrarMensagem(msg, tipo) {
+            const el = (tipo === 'success') ? document.getElementById('successMessage') : document.getElementById('errorMessage');
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+        function formatarMoeda(valor) { return 'R$ ' + (valor || 0).toFixed(2).replace('.', ','); }
+        function formatarData(data) {
+            if (!data) return '';
+            if (data.includes('T')) { return data.split('T')[0].split('-').reverse().join('/'); }
+            return data;
+        }
+        function inicializar() {
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('estoqueData').value = hoje;
+            document.getElementById('saidaData').value = hoje;
+            carregarDados();
+        }
+        
+        window.trocarAba = trocarAba;
+        window.adicionarEstoque = adicionarEstoque;
+        window.registrarSaida = registrarSaida;
+
+        document.addEventListener('DOMContentLoaded', inicializar);
+    </script>
+</body>
+</html>
