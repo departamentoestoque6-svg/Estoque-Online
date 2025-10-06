@@ -156,33 +156,33 @@
                     <h3>Entrada de Estoque</h3>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Produto <span style="color: red;">*</span></label>
+                            <label for="estoqueProduto">Produto <span style="color: red;">*</span></label>
                             <input type="text" id="estoqueProduto" placeholder="Ex: Papel Adesivo">
                         </div>
                         <div class="form-group">
-                            <label>Fornecedor</label>
+                            <label for="estoqueFornecedor">Fornecedor</label>
                             <input type="text" id="estoqueFornecedor" placeholder="Nome do fornecedor">
                         </div>
                         <div class="form-group">
-                            <label>Pacotes <span style="color: red;">*</span></label>
+                            <label for="estoquePacotes">Pacotes <span style="color: red;">*</span></label>
                             <input type="number" id="estoquePacotes" placeholder="0" min="0" value="0">
                         </div>
                         <div class="form-group">
-                            <label>Unidades Avulsas</label>
+                            <label for="estoqueUnidades">Unidades Avulsas</label>
                             <input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Custo/Pacote (R$) <span style="color: red;">*</span></label>
+                            <label for="estoqueCusto">Custo/Pacote (R$) <span style="color: red;">*</span></label>
                             <input type="number" step="0.01" id="estoqueCusto" placeholder="45.00" min="0">
                         </div>
                         <div class="form-group">
-                            <label>Estoque Mínimo (un)</label>
+                            <label for="estoqueMinimo">Estoque Mínimo (un)</label>
                             <input type="number" id="estoqueMinimo" placeholder="5000" min="0">
                         </div>
                         <div class="form-group">
-                            <label>Data da Compra</label>
+                            <label for="estoqueData">Data da Compra</label>
                             <input type="date" id="estoqueData">
                         </div>
                     </div>
@@ -210,23 +210,23 @@
                     <h3>Registrar Saída</h3>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Produto <span style="color: red;">*</span></label>
+                            <label for="saidaProduto">Produto <span style="color: red;">*</span></label>
                             <select id="saidaProduto"></select>
                         </div>
                         <div class="form-group">
-                            <label>Data <span style="color: red;">*</span></label>
+                            <label for="saidaData">Data <span style="color: red;">*</span></label>
                             <input type="date" id="saidaData">
                         </div>
                         <div class="form-group">
-                            <label>Pacotes</label>
+                            <label for="saidaPacotes">Pacotes</label>
                             <input type="number" id="saidaPacotes" value="0" min="0">
                         </div>
                         <div class="form-group">
-                            <label>Unidades</label>
+                            <label for="saidaUnidades">Unidades</label>
                             <input type="number" id="saidaUnidades" value="0" min="0">
                         </div>
                          <div class="form-group">
-                            <label>Destino</label>
+                            <label for="saidaDestino">Destino</label>
                             <input type="text" id="saidaDestino" placeholder="Cliente, pedido, etc">
                         </div>
                     </div>
@@ -253,4 +253,45 @@
     <script>
         const API_URL = '/api';
         const UN_POR_PACOTE = 5000;
-        let estoque
+        let estoque = [];
+        let saidas = [];
+
+        async function carregarDados() {
+            document.getElementById('saveStatus').textContent = 'Carregando...';
+            try {
+                const [estoqueRes, saidasRes] = await Promise.all([
+                    fetch(`${API_URL}/estoque`),
+                    fetch(`${API_URL}/saidas`)
+                ]);
+
+                if (!estoqueRes.ok || !saidasRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+
+                const estoqueData = await estoqueRes.json();
+                const saidasData = await saidasRes.json();
+                
+                estoque = estoqueData.data;
+                saidas = saidasData.data;
+
+                document.getElementById('saveStatus').textContent = 'Pronto';
+                console.log('Dados carregados do servidor.');
+                atualizarTodaUI();
+            } catch (error) {
+                document.getElementById('saveStatus').textContent = 'Erro de Conexão';
+                mostrarMensagem(error.message || 'Não foi possível conectar ao servidor. Verifique os logs e a conexão.', 'error');
+                console.error('Erro ao carregar dados:', error);
+            }
+        }
+
+        async function adicionarEstoque() {
+            const novoItem = {
+                produto: document.getElementById('estoqueProduto').value,
+                fornecedor: document.getElementById('estoqueFornecedor').value.trim(),
+                pacotes: parseInt(document.getElementById('estoquePacotes').value) || 0,
+                unidadesAvulsas: parseInt(document.getElementById('estoqueUnidades').value) || 0,
+                custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value),
+                estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
+                ultimaEntrada: document.getElementById('estoqueData').value
+            };
+
+            if (!novoItem.produto || (!novoItem.pacotes && !novoItem.unidadesAvulsas) || !novoItem.custoPorPacote) {
+                return mostrarMensagem('Preencha os campos obrigatórios (Produto, Quantidade e Custo)!', 'error');
