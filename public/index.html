@@ -168,17 +168,186 @@
         let meuGrafico = null;
         let sortConfig = { key: 'produto', direction: 'ascending' };
 
-        function getStatusEstoque(item) { /* ...mesma função de antes... */ }
-        function mostrarItensCriticos() { /* ...mesma função de antes... */ }
-        function ajustarCamposProduto() { /* ...mesma função de antes... */ }
-        async function carregarDados() { /* ...mesma função de antes... */ }
-        function atualizarDashboard(stats) { /* ...mesma função de antes... */ }
-        function renderizarGrafico(dadosEstoque) { /* ...mesma função de antes... */ }
-        async function adicionarEstoque() { /* ...mesma função de antes... */ }
-        function editarEstoque(index) { /* ...mesma função de antes... */ }
-        async function salvarEdicao() { /* ...mesma função de antes... */ }
-        async function excluirEstoque(id) { /* ...mesma função de antes... */ }
-        async function registrarSaida() { /* ...mesma função de antes... */ }
+        function getStatusEstoque(item) {
+            if (item.estoqueminimo > 0 && item.totalunidades <= item.estoqueminimo) {
+                return 'critico';
+            }
+            if (item.totalunidades < 5000 && item.totalunidades > 0 && !item.produto.toLowerCase().includes('rolo')) {
+                return 'baixo';
+            }
+            return 'ok';
+        }
+
+        function mostrarItensCriticos() {
+            document.getElementById('filtroStatus').value = 'critico';
+            trocarAba('estoque');
+        }
+
+        function ajustarCamposProduto() {
+            const select = document.getElementById('estoqueProduto');
+            const selectedOption = select.options[select.selectedIndex];
+            const tipo = selectedOption.dataset.tipo;
+            const labelPacotes = document.getElementById('labelPacotes');
+            const labelCusto = document.getElementById('labelCusto');
+            const groupUnidades = document.getElementById('groupUnidadesAvulsas');
+            const inputUnidades = document.getElementById('estoqueUnidades');
+            if (tipo === 'rolo') {
+                labelPacotes.innerHTML = 'Qtd. de Rolos <span style="color: red;">*</span>';
+                labelCusto.innerHTML = 'Custo por Rolo (R$) <span style="color: red;">*</span>';
+                groupUnidades.style.display = 'none';
+                inputUnidades.value = 0;
+            } else {
+                labelPacotes.innerHTML = 'Pacotes <span style="color: red;">*</span>';
+                labelCusto.innerHTML = 'Custo/Pacote (R$) <span style="color: red;">*</span>';
+                groupUnidades.style.display = 'flex';
+            }
+        }
+
+        async function carregarDados() {
+            document.getElementById('saveStatus').textContent = 'Carregando...';
+            try {
+                const [estoqueRes, saidasRes, statsRes] = await Promise.all([
+                    fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`), fetch(`${API_URL}/dashboard/stats`)
+                ]);
+                if (!estoqueRes.ok || !saidasRes.ok || !statsRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+                
+                const estoqueData = await estoqueRes.json();
+                const saidasData = await saidasRes.json();
+                const statsData = await statsRes.json();
+
+                estoque = estoqueData.data;
+                saidas = saidasData.data;
+                
+                document.getElementById('saveStatus').textContent = 'Pronto';
+                atualizarDashboard(statsData);
+                atualizarTodaUI();
+            } catch (error) {
+                document.getElementById('saveStatus').textContent = 'Erro de Conexão';
+                mostrarMensagem(error.message || 'Não foi possível conectar ao servidor.', 'error');
+                console.error('Erro ao carregar dados:', error);
+            }
+        }
+
+        function atualizarDashboard(stats) {
+            document.getElementById('dashTotalEstoque').textContent = `${parseFloat(stats.totalItens || 0).toLocaleString()} un`;
+            document.getElementById('dashValorEstoque').textContent = formatarMoeda(parseFloat(stats.valorTotal || 0));
+            document.getElementById('dashCriticos').textContent = stats.itensCriticos || 0;
+        }
+
+        function renderizarGrafico(dadosEstoque) {
+            const ctx = document.getElementById('graficoEstoque').getContext('2d');
+            if (meuGrafico) { meuGrafico.destroy(); }
+            const top5 = [...dadosEstoque].sort((a, b) => b.totalunidades - a.totalunidades).slice(0, 5);
+            const labels = top5.map(item => item.produto);
+            const data = top5.map(item => item.totalunidades);
+            meuGrafico = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Quantidade em Estoque',
+                        data: data,
+                        backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                        borderColor: 'rgba(41, 128, 185, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } }, responsive: true }
+            });
+        }
+
+        async function adicionarEstoque() {
+            const select = document.getElementById('estoqueProduto');
+            const selectedOption = select.options[select.selectedIndex];
+            const tipo = selectedOption.dataset.tipo;
+            
+            let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0;
+            let unidadesAvulsas = parseInt(document.getElementById('estoqueUnidades').value) || 0;
+            let custo = parseFloat(document.getElementById('estoqueCusto').value);
+
+            if (tipo === 'rolo') { unidadesAvulsas = 0; }
+            
+            const novoItem = {
+                produto: document.getElementById('estoqueProduto').value,
+                fornecedor: document.getElementById('estoqueFornecedor').value.trim(),
+                pacotes: pacotes,
+                unidadesAvulsas: unidadesAvulsas,
+                custoPorPacote: custo,
+                estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
+                ultimaEntrada: document.getElementById('estoqueData').value
+            };
+            if (!novoItem.produto || (tipo === 'cartela' && !novoItem.pacotes && !novoItem.unidadesAvulsas) || (tipo === 'rolo' && !novoItem.pacotes) || !novoItem.custoPorPacote) { 
+                return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); 
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(novoItem) });
+                if (!response.ok) throw new Error('Falha ao adicionar ao estoque.');
+                mostrarMensagem('Estoque atualizado com sucesso!', 'success');
+                limparFormEstoque();
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        function editarEstoque(index) {
+            const item = estoque[index];
+            document.getElementById('editId').value = item.id;
+            document.getElementById('editProduto').value = item.produto;
+            document.getElementById('editFornecedor').value = item.fornecedor || '';
+            document.getElementById('editPacotes').value = item.pacotes;
+            document.getElementById('editUnidades').value = item.unidadesavulsas;
+            document.getElementById('editCusto').value = item.custoporpacote;
+            document.getElementById('editMinimo').value = item.estoqueminimo;
+            document.getElementById('modalEdicao').style.display = 'block';
+        }
+
+        async function salvarEdicao() {
+            const id = document.getElementById('editId').value;
+            const dadosEditados = {
+                fornecedor: document.getElementById('editFornecedor').value.trim(),
+                pacotes: parseInt(document.getElementById('editPacotes').value) || 0,
+                unidadesavulsas: parseInt(document.getElementById('editUnidades').value) || 0,
+                custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0,
+                estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0
+            };
+            try {
+                const response = await fetch(`${API_URL}/estoque/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dadosEditados) });
+                if (!response.ok) throw new Error('Falha ao salvar as alterações.');
+                mostrarMensagem('Item atualizado com sucesso!', 'success');
+                fecharModal();
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        async function excluirEstoque(id) {
+            if (!confirm('Tem certeza? Esta ação não pode ser desfeita.')) return;
+            try {
+                const response = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Falha ao deletar o item.');
+                mostrarMensagem('Item deletado com sucesso!', 'success');
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        async function registrarSaida() {
+            const produtoId = parseInt(document.getElementById('saidaProduto').value);
+            const totalUnidades = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0);
+            if (!produtoId || !document.getElementById('saidaData').value || totalUnidades === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); }
+            const saida = {
+                data: document.getElementById('saidaData').value,
+                produtoId: produtoId,
+                totalUnidades: totalUnidades,
+                destino: document.getElementById('saidaDestino').value.trim()
+            };
+            try {
+                const response = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(saida) });
+                const result = await response.json();
+                if (!response.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); }
+                mostrarMensagem('Saída registrada com sucesso!', 'success');
+                limparFormSaida();
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
 
         function atualizarTodaUI() {
             renderizarEstoque();
@@ -193,9 +362,9 @@
             document.getElementById(`aba-${aba}`).classList.add('active');
             if (aba === 'estoque') { renderizarEstoque(); }
         }
-        
+
         function ordenarPor(key) {
-            if (key === 'acoes') return; // A coluna de ações não é ordenável
+            if (key === 'acoes') return;
             if (sortConfig.key === key && sortConfig.direction === 'ascending') {
                 sortConfig.direction = 'descending';
             } else {
@@ -210,36 +379,35 @@
             const filtroStatus = document.getElementById('filtroStatus').value;
             const tbody = document.getElementById('tabelaEstoque');
             tbody.innerHTML = '';
-
             let estoqueFiltrado = [...estoque].filter(item => {
                 const atendeTexto = item.produto.toLowerCase().includes(filtroTexto) || (item.fornecedor && item.fornecedor.toLowerCase().includes(filtroTexto));
                 const atendeStatus = (filtroStatus === 'todos') || (getStatusEstoque(item) === filtroStatus);
                 return atendeTexto && atendeStatus;
             });
-            
             estoqueFiltrado.sort((a, b) => {
-                if (a[sortConfig.key] < b[sortConfig.key]) {
-                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                const key = sortConfig.key;
+                const direction = sortConfig.direction === 'ascending' ? 1 : -1;
+
+                const valA = key === 'status' ? getStatusEstoque(a) : a[key] || '';
+                const valB = key === 'status' ? getStatusEstoque(b) : b[key] || '';
+                
+                if (typeof valA === 'string' && typeof valB === 'string') {
+                    return valA.localeCompare(valB) * direction;
                 }
-                if (a[sortConfig.key] > b[sortConfig.key]) {
-                    return sortConfig.direction === 'ascending' ? 1 : -1;
-                }
+                
+                if (valA < valB) return -1 * direction;
+                if (valA > valB) return 1 * direction;
                 return 0;
             });
-
             document.querySelectorAll('.sort-arrow').forEach(arrow => arrow.innerHTML = '');
             const arrowSpan = document.getElementById(`arrow-${sortConfig.key}`);
-            if (arrowSpan) {
-                arrowSpan.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼';
-            }
-
+            if (arrowSpan) { arrowSpan.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; }
             estoqueFiltrado.forEach((item) => {
                 const tr = document.createElement('tr');
                 const status = getStatusEstoque(item);
                 let badgeClass = 'badge-success';
                 if (status === 'baixo') badgeClass = 'badge-warning';
                 if (status === 'critico') badgeClass = 'badge-danger';
-                
                 tr.innerHTML = `
                     <td>
                         <button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button>
@@ -256,15 +424,65 @@
             });
         }
 
-        function renderizarSaidas() { /* ...mesma função de antes... */ }
-        function atualizarProdutosDisponiveis() { /* ...mesma função de antes... */ }
-        function limparFormEstoque() { /* ...mesma função de antes... */ }
-        function limparFormSaida() { /* ...mesma função de antes... */ }
-        function fecharModal() { /* ...mesma função de antes... */ }
-        function mostrarMensagem(msg, tipo) { /* ...mesma função de antes... */ }
-        function formatarMoeda(valor) { /* ...mesma função de antes... */ }
-        function formatarData(data) { /* ...mesma função de antes... */ }
-        
+        function renderizarSaidas() {
+             const tbody = document.getElementById('tabelaSaida');
+             tbody.innerHTML = '';
+             saidas.forEach(saida => {
+                 const tr = document.createElement('tr');
+                 tr.innerHTML = `
+                    <td>${formatarData(saida.data)}</td>
+                    <td>${saida.produtonome}</td>
+                    <td class="number">${(saida.totalunidades || 0).toLocaleString()}</td>
+                    <td class="currency">${formatarMoeda(saida.custototal)}</td>
+                    <td>${saida.destino || '-'}</td>
+                 `;
+                 tbody.appendChild(tr);
+             });
+        }
+        function atualizarProdutosDisponiveis() {
+            const select = document.getElementById('saidaProduto');
+            select.innerHTML = '<option value="">Selecione...</option>';
+            estoque.forEach(item => {
+                if (item.totalunidades > 0) {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = `${item.produto} (Disponível: ${(item.totalunidades || 0).toLocaleString()} un)`;
+                    select.appendChild(opt);
+                }
+            });
+        }
+        function limparFormEstoque() {
+            document.getElementById('estoqueProduto').value = '';
+            document.getElementById('estoqueFornecedor').value = '';
+            document.getElementById('estoquePacotes').value = '0';
+            document.getElementById('estoqueUnidades').value = '0';
+            document.getElementById('estoqueCusto').value = '';
+            document.getElementById('estoqueMinimo').value = '';
+            document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0];
+            ajustarCamposProduto();
+        }
+        function limparFormSaida() {
+            document.getElementById('saidaProduto').value = '';
+            document.getElementById('saidaData').value = new Date().toISOString().split('T')[0];
+            document.getElementById('saidaPacotes').value = '0';
+            document.getElementById('saidaUnidades').value = '0';
+            document.getElementById('saidaDestino').value = '';
+        }
+        function fecharModal() { document.getElementById('modalEdicao').style.display = 'none'; }
+        function mostrarMensagem(msg, tipo) {
+            const el = (tipo === 'success') ? document.getElementById('successMessage') : document.getElementById('errorMessage');
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+        function formatarMoeda(valor) { return 'R$ ' + (valor || 0).toFixed(2).replace('.', ','); }
+        function formatarData(data) {
+            if (!data) return '';
+            if (data.includes('T')) { return data.split('T')[0].split('-').reverse().join('/'); }
+            return String(data).split('-').reverse().join('/');
+        }
         function inicializar() {
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('estoqueData').value = hoje;
