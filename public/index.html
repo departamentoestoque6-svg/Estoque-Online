@@ -83,7 +83,27 @@
                 <div class="section">
                     <h3>Entrada de Estoque</h3>
                     <div class="form-row">
-                        <div class="form-group"><label for="estoqueProduto">Produto <span style="color: red;">*</span></label><select id="estoqueProduto" onchange="ajustarCamposProduto()"><option value="">Selecione...</option><option data-tipo="rolo">Papel Adesivo</option><option data-tipo="rolo">Poliester</option><option data-tipo="rolo">Rolo de Ribbon</option><option data-tipo="rolo">Rolo de Etiqueta Travanel</option><option data-tipo="cartela">Conjunto Cartela Verde</option><option data-tipo="cartela">Conjunto Cartela Branca</option><option data-tipo="cartela">Cartela Brinco Trio Verde</option><option data-tipo="cartela">Cartela Brinco Trio Branca</option><option data-tipo="cartela">Conjunto Cartela Verde Quadrada</option><option data-tipo="cartela">Cartela Capelinha</option><option data-tipo="cartela">Cartela de Pulseira Verde</option><option data-tipo="cartela">Cartela de Pulseira Branca</option><option data-tipo="cartela">Cartela Quadrada Branca M de Brinco</option><option data-tipo="cartela">Cartela Quadrada Verde M de Brinco</option><option data-tipo="cartela">Cartela Quadrada Branca G de Brinco</option></select></div>
+                        <div class="form-group">
+                            <label for="estoqueProduto">Produto <span style="color: red;">*</span></label>
+                            <select id="estoqueProduto" onchange="ajustarCamposProduto()">
+                                <option value="">Selecione...</option>
+                                <option data-tipo="rolo">Papel Adesivo</option>
+                                <option data-tipo="rolo">Poliester</option>
+                                <option data-tipo="rolo">Rolo de Ribbon</option>
+                                <option data-tipo="rolo">Rolo de Etiqueta Travanel</option>
+                                <option data-tipo="cartela">Conjunto Cartela Verde</option>
+                                <option data-tipo="cartela">Conjunto Cartela Branca</option>
+                                <option data-tipo="cartela">Cartela Brinco Trio Verde</option>
+                                <option data-tipo="cartela">Cartela Brinco Trio Branca</option>
+                                <option data-tipo="cartela">Conjunto Cartela Verde Quadrada</option>
+                                <option data-tipo="cartela">Cartela Capelinha</option>
+                                <option data-tipo="cartela">Cartela de Pulseira Verde</option>
+                                <option data-tipo="cartela">Cartela de Pulseira Branca</option>
+                                <option data-tipo="cartela">Cartela Quadrada Branca M de Brinco</option>
+                                <option data-tipo="cartela">Cartela Quadrada Verde M de Brinco</option>
+                                <option data-tipo="cartela">Cartela Quadrada Branca G de Brinco</option>
+                            </select>
+                        </div>
                         <div class="form-group"><label for="estoqueFornecedorId">Fornecedor</label><select id="estoqueFornecedorId"><option value="">Sem Fornecedor</option></select></div>
                         <div class="form-group"><label for="estoquePacotes" id="labelPacotes">Pacotes <span style="color: red;">*</span></label><input type="number" id="estoquePacotes" placeholder="0" min="0" value="0"></div>
                         <div class="form-group" id="groupUnidadesAvulsas"><label for="estoqueUnidades">Unidades Avulsas</label><input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0"></div>
@@ -159,7 +179,7 @@
             <input type="hidden" id="editId">
             <div class="form-row">
                 <div class="form-group"><label>Produto</label><input type="text" id="editProduto" readonly></div>
-                <div class="form-group"><label for="editFornecedor">Fornecedor</label><input type="text" id="editFornecedor"></div>
+                <div class="form-group"><label for="editFornecedorId">Fornecedor</label><select id="editFornecedorId"></select></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label for="editPacotes">Pacotes</label><input type="number" id="editPacotes" min="0"></div>
@@ -213,6 +233,7 @@
                     fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`), fetch(`${API_URL}/dashboard/stats`), fetch(`${API_URL}/fornecedores`)
                 ]);
                 if (!estoqueRes.ok || !saidasRes.ok || !statsRes.ok || !fornecedoresRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+                
                 const estoqueData = await estoqueRes.json();
                 const saidasData = await saidasRes.json();
                 const statsData = await statsRes.json();
@@ -235,7 +256,7 @@
             atualizarProdutosDisponiveis();
             renderizarGrafico(estoque);
             renderizarFornecedores();
-            popularDropdownFornecedores();
+            popularDropdownFornecedores('estoqueFornecedorId');
         }
 
         // Funções do Dashboard
@@ -252,25 +273,42 @@
             const data = top5.map(item => item.totalunidades);
             meuGrafico = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Quantidade em Estoque', data: data, backgroundColor: 'rgba(52, 152, 219, 0.7)', borderColor: 'rgba(41, 128, 185, 1)', borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, responsive: true } });
         }
+        function mostrarItensCriticos() {
+            document.getElementById('filtroStatus').value = 'critico';
+            trocarAba('estoque');
+        }
         
-        // Funções do Estoque
-        async function adicionarEstoque() {
+        // Funções do Formulário e Estoque
+        function ajustarCamposProduto() {
             const select = document.getElementById('estoqueProduto');
             const selectedOption = select.options[select.selectedIndex];
             const tipo = selectedOption.dataset.tipo;
-            let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0;
-            let unidadesAvulsas = parseInt(document.getElementById('estoqueUnidades').value) || 0;
-            if (tipo === 'rolo') { unidadesAvulsas = 0; }
+            const labelPacotes = document.getElementById('labelPacotes');
+            const labelCusto = document.getElementById('labelCusto');
+            const groupUnidades = document.getElementById('groupUnidadesAvulsas');
+            const inputUnidades = document.getElementById('estoqueUnidades');
+            if (tipo === 'rolo') {
+                labelPacotes.innerHTML = 'Qtd. de Rolos <span style="color: red;">*</span>';
+                labelCusto.innerHTML = 'Custo por Rolo (R$) <span style="color: red;">*</span>';
+                groupUnidades.style.display = 'none';
+                inputUnidades.value = 0;
+            } else {
+                labelPacotes.innerHTML = 'Pacotes <span style="color: red;">*</span>';
+                labelCusto.innerHTML = 'Custo/Pacote (R$) <span style="color: red;">*</span>';
+                groupUnidades.style.display = 'flex';
+            }
+        }
+        async function adicionarEstoque() {
             const novoItem = {
                 produto: document.getElementById('estoqueProduto').value,
                 fornecedor_id: document.getElementById('estoqueFornecedorId').value || null,
-                pacotes: pacotes,
-                unidadesAvulsas: unidadesAvulsas,
+                pacotes: parseInt(document.getElementById('estoquePacotes').value) || 0,
+                unidadesAvulsas: parseInt(document.getElementById('estoqueUnidades').value) || 0,
                 custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value),
                 estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
                 ultimaEntrada: document.getElementById('estoqueData').value
             };
-            if (!novoItem.produto || (tipo === 'cartela' && !novoItem.pacotes && !novoItem.unidadesAvulsas) || (tipo === 'rolo' && !novoItem.pacotes) || !novoItem.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); }
+            if (!novoItem.produto || (!novoItem.pacotes && !novoItem.unidadesAvulsas) || !novoItem.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); }
             try {
                 const response = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(novoItem) });
                 if (!response.ok) throw new Error('Falha ao adicionar ao estoque.');
@@ -283,8 +321,7 @@
             const item = estoque[index];
             document.getElementById('editId').value = item.id;
             document.getElementById('editProduto').value = item.produto;
-            // A edição do fornecedor precisaria de uma lógica mais complexa com o dropdown, simplificado por enquanto
-            document.getElementById('editFornecedor').value = item.fornecedor_nome || ''; 
+            popularDropdownFornecedores('editFornecedorId', item.fornecedor_id);
             document.getElementById('editPacotes').value = item.pacotes;
             document.getElementById('editUnidades').value = item.unidadesavulsas;
             document.getElementById('editCusto').value = item.custoporpacote;
@@ -294,7 +331,7 @@
         async function salvarEdicao() {
             const id = document.getElementById('editId').value;
             const dadosEditados = {
-                fornecedor: document.getElementById('editFornecedor').value.trim(), // Simplificado: salvando como texto por enquanto
+                fornecedor_id: document.getElementById('editFornecedorId').value || null,
                 pacotes: parseInt(document.getElementById('editPacotes').value) || 0,
                 unidadesavulsas: parseInt(document.getElementById('editUnidades').value) || 0,
                 custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0,
@@ -360,12 +397,12 @@
             } catch (error) { mostrarMensagem(error.message, 'error'); }
         }
 
-        // Funções de UI e Auxiliares
+        // Funções de Renderização e UI
         function trocarAba(aba) {
             document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
             document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active');
             document.getElementById(`aba-${aba}`).classList.add('active');
-            if (aba === 'estoque' || aba === 'fornecedores') { atualizarTodaUI(); }
+            if (['dashboard', 'estoque', 'saida', 'fornecedores'].includes(aba)) { atualizarTodaUI(); }
         }
         function ordenarPor(key) {
             if (key === 'acoes') return;
@@ -425,8 +462,9 @@
                 tbody.appendChild(tr);
             });
         }
-        function popularDropdownFornecedores() {
-            const select = document.getElementById('estoqueFornecedorId');
+        function popularDropdownFornecedores(selectId, selectedValue = null) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
             const currentValue = select.value;
             select.innerHTML = '<option value="">Sem Fornecedor</option>';
             fornecedores.forEach(f => {
@@ -435,7 +473,7 @@
                 opt.textContent = f.nome;
                 select.appendChild(opt);
             });
-            select.value = currentValue;
+            select.value = selectedValue || currentValue;
         }
         function atualizarProdutosDisponiveis() {
             const select = document.getElementById('saidaProduto');
@@ -449,6 +487,8 @@
                 }
             });
         }
+
+        // Funções de Limpeza e Auxiliares
         function limparFormEstoque() {
             document.getElementById('estoqueProduto').value = '';
             document.getElementById('estoqueFornecedorId').value = '';
@@ -472,6 +512,8 @@
             if (data.includes('T')) { return data.split('T')[0].split('-').reverse().join('/'); }
             return String(data).split('-').reverse().join('/');
         }
+        
+        // Inicialização
         function inicializar() {
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('estoqueData').value = hoje;
