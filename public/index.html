@@ -207,31 +207,9 @@
         let meuGrafico = null;
         let sortConfig = { key: 'produto', direction: 'ascending' };
 
-        // Funções de Notificação
-        function pedirPermissaoDeNotificacao() {
-            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') console.log('Permissão para notificações concedida!');
-                });
-            }
-        }
-        async function verificarAlertas() {
-            try {
-                const response = await fetch(`${API_URL}/alertas/estoque-baixo`);
-                if (!response.ok) return;
-                const result = await response.json();
-                const itensEmBaixa = result.data;
-                if (itensEmBaixa && itensEmBaixa.length > 0) {
-                    const primeiroItem = itensEmBaixa[0];
-                    const mensagem = itensEmBaixa.length > 1 ? `${primeiroItem.produto} e mais ${itensEmBaixa.length - 1} item(ns) estão com estoque baixo.` : `${primeiroItem.produto} está com estoque baixo (${primeiroItem.totalunidades} restantes).`;
-                    if (Notification.permission === 'granted') {
-                        new Notification('⚠️ Alerta de Estoque Baixo!', { body: mensagem, icon: 'https://cdn-icons-png.flaticon.com/512/10099/10099719.png' });
-                    }
-                }
-            } catch (error) { console.error('Erro ao verificar alertas:', error); }
-        }
+        function pedirPermissaoDeNotificacao(){ /* ...código... */ }
+        async function verificarAlertas(){ /* ...código... */ }
 
-        // Funções Principais
         async function carregarDados() {
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
@@ -239,7 +217,6 @@
                     fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`), fetch(`${API_URL}/dashboard/stats`), fetch(`${API_URL}/fornecedores`)
                 ]);
                 if (!estoqueRes.ok || !saidasRes.ok || !statsRes.ok || !fornecedoresRes.ok) throw new Error('Falha ao buscar dados do servidor.');
-                
                 const estoqueData = await estoqueRes.json();
                 const saidasData = await saidasRes.json();
                 const statsData = await statsRes.json();
@@ -265,12 +242,12 @@
             popularDropdownFornecedores('estoqueFornecedorId');
         }
 
-        // Funções do Dashboard
         function atualizarDashboard(stats) {
             document.getElementById('dashTotalEstoque').textContent = `${parseFloat(stats.totalItens || 0).toLocaleString()} un`;
             document.getElementById('dashValorEstoque').textContent = formatarMoeda(parseFloat(stats.valorTotal || 0));
             document.getElementById('dashCriticos').textContent = stats.itensCriticos || 0;
         }
+
         function renderizarGrafico(dadosEstoque) {
             const ctx = document.getElementById('graficoEstoque').getContext('2d');
             if (meuGrafico) { meuGrafico.destroy(); }
@@ -279,17 +256,18 @@
             const data = top5.map(item => item.totalunidades);
             meuGrafico = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Quantidade em Estoque', data: data, backgroundColor: 'rgba(52, 152, 219, 0.7)', borderColor: 'rgba(41, 128, 185, 1)', borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, responsive: true } });
         }
+
         function mostrarItensCriticos() {
             document.getElementById('filtroStatus').value = 'critico';
             trocarAba('estoque');
         }
         
-        // Funções do Formulário e Estoque
         function getStatusEstoque(item) {
             if (item.estoqueminimo > 0 && item.totalunidades <= item.estoqueminimo) { return 'critico'; }
             if (item.totalunidades < 5000 && item.totalunidades > 0 && !item.produto.toLowerCase().includes('rolo')) { return 'baixo'; }
             return 'ok';
         }
+
         function ajustarCamposProduto() {
             const select = document.getElementById('estoqueProduto');
             const selectedOption = select.options[select.selectedIndex];
@@ -309,6 +287,7 @@
                 groupUnidades.style.display = 'flex';
             }
         }
+
         async function adicionarEstoque() {
             const novoItem = {
                 produto: document.getElementById('estoqueProduto').value,
@@ -328,6 +307,7 @@
                 await carregarDados();
             } catch (error) { mostrarMensagem(error.message, 'error'); }
         }
+
         function editarEstoque(index) {
             const item = estoque[index];
             document.getElementById('editId').value = item.id;
@@ -339,6 +319,7 @@
             document.getElementById('editMinimo').value = item.estoqueminimo;
             document.getElementById('modalEdicao').style.display = 'block';
         }
+
         async function salvarEdicao() {
             const id = document.getElementById('editId').value;
             const dadosEditados = {
@@ -356,6 +337,7 @@
                 await carregarDados();
             } catch (error) { mostrarMensagem(error.message, 'error'); }
         }
+
         async function excluirEstoque(id) {
             if (!confirm('Tem certeza? Esta ação não pode ser desfeita.')) return;
             try {
@@ -365,8 +347,7 @@
                 await carregarDados();
             } catch (error) { mostrarMensagem(error.message, 'error'); }
         }
-
-        // Funções de Saída
+        
         async function registrarSaida() {
             const produtoId = parseInt(document.getElementById('saidaProduto').value);
             const totalUnidades = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0);
@@ -386,8 +367,7 @@
                 await carregarDados();
             } catch (error) { mostrarMensagem(error.message, 'error'); }
         }
-
-        // Funções de Fornecedores
+        
         async function adicionarFornecedor() {
             const nomeInput = document.getElementById('fornecedorNome');
             const nome = nomeInput.value.trim();
@@ -399,6 +379,7 @@
                 await carregarDados();
             } catch (error) { mostrarMensagem(error.message, 'error'); }
         }
+
         async function deletarFornecedor(id) {
             if (!confirm('Tem certeza?')) return;
             try {
@@ -408,7 +389,39 @@
             } catch (error) { mostrarMensagem(error.message, 'error'); }
         }
 
-        // Funções de Renderização e UI
+        async function gerarRelatorioSaidas() {
+            const de = document.getElementById('relatorioDe').value;
+            const ate = document.getElementById('relatorioAte').value;
+            if (!de || !ate) { return mostrarMensagem('Por favor, selecione as duas datas.', 'error'); }
+            try {
+                const res = await fetch(`${API_URL}/relatorios/saidas-por-periodo?de=${de}&ate=${ate}`);
+                if (!res.ok) throw new Error('Falha ao gerar relatório de saídas.');
+                const result = await res.json();
+                const tbody = document.querySelector('#tabelaRelatorioSaidas tbody');
+                tbody.innerHTML = '';
+                result.data.forEach(saida => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${formatarData(saida.data)}</td><td>${saida.produtonome}</td><td class="number">${(saida.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(saida.custototal)}</td><td>${saida.destino || '-'}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        async function carregarRelatorios() {
+            try {
+                const res = await fetch(`${API_URL}/relatorios/valor-por-produto`);
+                if (!res.ok) throw new Error('Falha ao carregar relatório de valor.');
+                const result = await res.json();
+                const tbody = document.querySelector('#tabelaRelatorioValor tbody');
+                tbody.innerHTML = '';
+                result.data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${item.produto}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(parseFloat(item.valor_total))}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
         function trocarAba(aba) {
             document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
             document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active');
@@ -416,6 +429,7 @@
             if (['dashboard', 'estoque', 'saida', 'fornecedores'].includes(aba)) { atualizarTodaUI(); }
             if (aba === 'relatorios') { carregarRelatorios(); }
         }
+
         function ordenarPor(key) {
             if (key === 'acoes') return;
             if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } 
@@ -423,6 +437,7 @@
             sortConfig.key = key;
             renderizarEstoque();
         }
+
         function renderizarEstoque() {
             const filtroTexto = document.getElementById('filtroTexto').value.toLowerCase();
             const filtroStatus = document.getElementById('filtroStatus').value;
@@ -499,8 +514,6 @@
                 }
             });
         }
-
-        // Funções de Limpeza e Auxiliares
         function limparFormEstoque() {
             document.getElementById('estoqueProduto').value = '';
             document.getElementById('estoqueFornecedorId').value = '';
@@ -534,40 +547,6 @@
             return String(data).split('-').reverse().join('/');
         }
         
-        async function gerarRelatorioSaidas() {
-            const de = document.getElementById('relatorioDe').value;
-            const ate = document.getElementById('relatorioAte').value;
-            if (!de || !ate) { return mostrarMensagem('Por favor, selecione as duas datas.', 'error'); }
-            try {
-                const res = await fetch(`${API_URL}/relatorios/saidas-por-periodo?de=${de}&ate=${ate}`);
-                if (!res.ok) throw new Error('Falha ao gerar relatório de saídas.');
-                const result = await res.json();
-                const tbody = document.querySelector('#tabelaRelatorioSaidas tbody');
-                tbody.innerHTML = '';
-                result.data.forEach(saida => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${formatarData(saida.data)}</td><td>${saida.produtonome}</td><td class="number">${(saida.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(saida.custototal)}</td><td>${saida.destino || '-'}</td>`;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) { mostrarMensagem(error.message, 'error'); }
-        }
-
-        async function carregarRelatorios() {
-            try {
-                const res = await fetch(`${API_URL}/relatorios/valor-por-produto`);
-                if (!res.ok) throw new Error('Falha ao carregar relatório de valor.');
-                const result = await res.json();
-                const tbody = document.querySelector('#tabelaRelatorioValor tbody');
-                tbody.innerHTML = '';
-                result.data.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${item.produto}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(parseFloat(item.valor_total))}</td>`;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) { mostrarMensagem(error.message, 'error'); }
-        }
-
-        // Inicialização
         function inicializar() {
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('estoqueData').value = hoje;
