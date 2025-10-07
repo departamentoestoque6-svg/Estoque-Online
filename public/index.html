@@ -430,6 +430,7 @@
         }
         function renderizarRelatorio(dados, tabelaId) {
             const tbody = document.querySelector(`#${tabelaId} tbody`);
+            if (!tbody) return;
             tbody.innerHTML = '';
             dados.forEach(saida => {
                 const tr = document.createElement('tr');
@@ -439,6 +440,7 @@
         }
         function renderizarRelatorioValor(dados) {
             const tbody = document.querySelector('#tabelaRelatorioValor tbody');
+            if (!tbody) return;
             tbody.innerHTML = '';
             dados.forEach(item => {
                 const tr = document.createElement('tr');

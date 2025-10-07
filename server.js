@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA com Relatórios
+// server.js - VERSÃO COMPLETA com Relatórios
 
 require('dotenv').config();
 const express = require('express');
@@ -23,9 +23,7 @@ const createTables = async () => {
   try {
     await pool.query(queryText);
     console.log('Tabelas verificadas/criadas com sucesso.');
-  } catch (err) {
-    console.error('Erro ao criar tabelas:', err);
-  }
+  } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
 
 app.use(cors());
@@ -80,8 +78,10 @@ app.get('/api/saidas', async (req, res) => {
 
 app.post('/api/estoque', async (req, res) => {
     const { produto, fornecedor_id, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
+    let totalUnidadesAdicionadas;
     const tipo = produto.toLowerCase().includes('rolo') ? 'rolo' : 'cartela';
-    const totalUnidadesAdicionadas = tipo === 'rolo' ? pacotes : (pacotes * 5000) + unidadesAvulsas;
+    if (tipo === 'rolo') { totalUnidadesAdicionadas = pacotes; } 
+    else { totalUnidadesAdicionadas = (pacotes * 5000) + unidadesAvulsas; }
     try {
         const selectRes = await pool.query('SELECT * FROM estoque WHERE produto = $1 AND (fornecedor_id = $2 OR (fornecedor_id IS NULL AND $2 IS NULL))', [produto, fornecedor_id || null]);
         if (selectRes.rows.length > 0) {
@@ -175,16 +175,12 @@ app.delete('/api/fornecedores/:id', async (req, res) => {
 app.get('/api/relatorios/valor-por-produto', async (req, res) => {
   try {
     const query = `
-      SELECT 
-        produto, 
-        totalunidades,
+      SELECT produto, totalunidades,
         CASE
           WHEN produto ILIKE '%rolo%' THEN totalunidades * custoporpacote
           ELSE (totalunidades / 5000.0) * custoporpacote
         END AS valor_total
-      FROM estoque
-      WHERE totalunidades > 0
-      ORDER BY produto;
+      FROM estoque WHERE totalunidades > 0 ORDER BY produto;
     `;
     const result = await pool.query(query);
     res.json({ data: result.rows });
