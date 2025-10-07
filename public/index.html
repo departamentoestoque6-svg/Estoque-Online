@@ -85,7 +85,27 @@
                 <div class="section">
                     <h3>Entrada de Estoque</h3>
                     <div class="form-row">
-                        <div class="form-group"><label for="estoqueProduto">Produto <span style="color: red;">*</span></label><select id="estoqueProduto" onchange="ajustarCamposProduto()"><option value="">Selecione...</option><option data-tipo="rolo">Papel Adesivo</option><option data-tipo="rolo">Poliester</option><option data-tipo="rolo">Rolo de Ribbon</option><option data-tipo="rolo">Rolo de Etiqueta Travanel</option><option data-tipo="cartela">Conjunto Cartela Verde</option><option data-tipo="cartela">Conjunto Cartela Branca</option><option data-tipo="cartela">Cartela Brinco Trio Verde</option><option data-tipo="cartela">Cartela Brinco Trio Branca</option><option data-tipo="cartela">Conjunto Cartela Verde Quadrada</option><option data-tipo="cartela">Cartela Capelinha</option><option data-tipo="cartela">Cartela de Pulseira Verde</option><option data-tipo="cartela">Cartela de Pulseira Branca</option><option data-tipo="cartela">Cartela Quadrada Branca M de Brinco</option><option data-tipo="cartela">Cartela Quadrada Verde M de Brinco</option><option data-tipo="cartela">Cartela Quadrada Branca G de Brinco</option></select></div>
+                        <div class="form-group">
+                            <label for="estoqueProduto">Produto <span style="color: red;">*</span></label>
+                            <select id="estoqueProduto" onchange="ajustarCamposProduto()">
+                                <option value="">Selecione...</option>
+                                <option data-tipo="rolo">Papel Adesivo</option>
+                                <option data-tipo="rolo">Poliester</option>
+                                <option data-tipo="rolo">Rolo de Ribbon</option>
+                                <option data-tipo="rolo">Rolo de Etiqueta Travanel</option>
+                                <option data-tipo="rolo">Rolo de Etiqueta Brinco</option> <option data-tipo="cartela">Conjunto Cartela Verde</option>
+                                <option data-tipo="cartela">Conjunto Cartela Branca</option>
+                                <option data-tipo="cartela">Cartela Brinco Trio Verde</option>
+                                <option data-tipo="cartela">Cartela Brinco Trio Branca</option>
+                                <option data-tipo="cartela">Conjunto Cartela Verde Quadrada</option>
+                                <option data-tipo="cartela">Cartela Capelinha</option>
+                                <option data-tipo="cartela">Cartela de Pulseira Verde</option>
+                                <option data-tipo="cartela">Cartela de Pulseira Branca</option>
+                                <option data-tipo="cartela">Cartela Quadrada Branca M de Brinco</option>
+                                <option data-tipo="cartela">Cartela Quadrada Verde M de Brinco</option>
+                                <option data-tipo="cartela">Cartela Quadrada Branca G de Brinco</option>
+                            </select>
+                        </div>
                         <div class="form-group"><label for="estoqueFornecedorId">Fornecedor</label><select id="estoqueFornecedorId"><option value="">Sem Fornecedor</option></select></div>
                         <div class="form-group"><label for="estoquePacotes" id="labelPacotes">Pacotes <span style="color: red;">*</span></label><input type="number" id="estoquePacotes" placeholder="0" min="0" value="0"></div>
                         <div class="form-group" id="groupUnidadesAvulsas"><label for="estoqueUnidades">Unidades Avulsas</label><input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0"></div>
