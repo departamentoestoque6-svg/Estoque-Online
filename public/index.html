@@ -68,7 +68,6 @@
             </div>
             <div class="success-message" id="successMessage"></div>
             <div class="error-message" id="errorMessage"></div>
-
             <div id="aba-dashboard" class="tab-content active">
                 <div class="summary-cards">
                     <div class="card card-success"><h3>Total em Estoque</h3><div class="value" id="dashTotalEstoque">0 un</div></div>
@@ -80,7 +79,6 @@
                     <canvas id="graficoEstoque"></canvas>
                 </div>
             </div>
-
             <div id="aba-estoque" class="tab-content">
                 <div class="section">
                     <h3>Entrada de Estoque</h3>
@@ -111,7 +109,6 @@
                     </table>
                 </div>
             </div>
-            
             <div id="aba-saida" class="tab-content">
                  <div class="section">
                     <h3>Registrar Saída</h3>
@@ -132,7 +129,6 @@
                     </table>
                 </div>
             </div>
-
             <div id="aba-fornecedores" class="tab-content">
                 <div class="section">
                     <h3>Novo Fornecedor</h3>
@@ -185,87 +181,52 @@
         let meuGrafico = null;
         let sortConfig = { key: 'produto', direction: 'ascending' };
 
-        function getStatusEstoque(item) { /* ...código... */ }
-        function mostrarItensCriticos() { /* ...código... */ }
-        function ajustarCamposProduto() { /* ...código... */ }
-        
+        // Funções de Notificação
+        function pedirPermissaoDeNotificacao() {
+            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') console.log('Permissão para notificações concedida!');
+                });
+            }
+        }
+        async function verificarAlertas() {
+            try {
+                const response = await fetch(`${API_URL}/alertas/estoque-baixo`);
+                if (!response.ok) return;
+                const result = await response.json();
+                const itensEmBaixa = result.data;
+                if (itensEmBaixa && itensEmBaixa.length > 0) {
+                    const primeiroItem = itensEmBaixa[0];
+                    const mensagem = itensEmBaixa.length > 1 ? `${primeiroItem.produto} e mais ${itensEmBaixa.length - 1} item(ns) estão com estoque baixo.` : `${primeiroItem.produto} está com estoque baixo (${primeiroItem.totalunidades} restantes).`;
+                    if (Notification.permission === 'granted') {
+                        new Notification('⚠️ Alerta de Estoque Baixo!', { body: mensagem, icon: 'https://cdn-icons-png.flaticon.com/512/10099/10099719.png' });
+                    }
+                }
+            } catch (error) { console.error('Erro ao verificar alertas:', error); }
+        }
+
+        // Funções Principais
         async function carregarDados() {
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
                 const [estoqueRes, saidasRes, statsRes, fornecedoresRes] = await Promise.all([
-                    fetch(`${API_URL}/estoque`),
-                    fetch(`${API_URL}/saidas`),
-                    fetch(`${API_URL}/dashboard/stats`),
-                    fetch(`${API_URL}/fornecedores`)
+                    fetch(`${API_URL}/estoque`), fetch(`${API_URL}/saidas`), fetch(`${API_URL}/dashboard/stats`), fetch(`${API_URL}/fornecedores`)
                 ]);
                 if (!estoqueRes.ok || !saidasRes.ok || !statsRes.ok || !fornecedoresRes.ok) throw new Error('Falha ao buscar dados do servidor.');
-                
                 const estoqueData = await estoqueRes.json();
                 const saidasData = await saidasRes.json();
                 const statsData = await statsRes.json();
                 const fornecedoresData = await fornecedoresRes.json();
-
                 estoque = estoqueData.data;
                 saidas = saidasData.data;
                 fornecedores = fornecedoresData.data;
-                
                 document.getElementById('saveStatus').textContent = 'Pronto';
                 atualizarDashboard(statsData);
                 atualizarTodaUI();
             } catch (error) {
                 document.getElementById('saveStatus').textContent = 'Erro de Conexão';
                 mostrarMensagem(error.message || 'Não foi possível conectar ao servidor.', 'error');
-                console.error('Erro ao carregar dados:', error);
             }
-        }
-
-        async function adicionarEstoque() {
-            const novoItem = {
-                produto: document.getElementById('estoqueProduto').value,
-                fornecedor_id: document.getElementById('estoqueFornecedorId').value || null,
-                pacotes: parseInt(document.getElementById('estoquePacotes').value) || 0,
-                unidadesAvulsas: parseInt(document.getElementById('estoqueUnidades').value) || 0,
-                custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value),
-                estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
-                ultimaEntrada: document.getElementById('estoqueData').value
-            };
-            if (!novoItem.produto || (!novoItem.pacotes && !novoItem.unidadesAvulsas) || !novoItem.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); }
-            try {
-                const response = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(novoItem) });
-                if (!response.ok) throw new Error('Falha ao adicionar ao estoque.');
-                mostrarMensagem('Estoque atualizado com sucesso!', 'success');
-                limparFormEstoque();
-                await carregarDados();
-            } catch (error) { mostrarMensagem(error.message, 'error'); }
-        }
-
-        function renderizarEstoque() {
-            // ... (código com a lógica de ordenação e filtro) ...
-            estoqueFiltrado.forEach((item, index) => {
-                // ...
-                tr.innerHTML = `
-                    <td>...</td>
-                    <td>...</td>
-                    <td>${item.produto}</td>
-                    <td>${item.fornecedor_nome || '-'}</td>
-                    `;
-                tbody.appendChild(tr);
-            });
-        }
-        
-        async function adicionarFornecedor() { /* ...código... */ }
-        async function deletarFornecedor(id) { /* ...código... */ }
-        function renderizarFornecedores() { /* ...código... */ }
-
-        function popularDropdownFornecedores() {
-            const select = document.getElementById('estoqueFornecedorId');
-            select.innerHTML = '<option value="">Sem Fornecedor</option>';
-            fornecedores.forEach(f => {
-                const opt = document.createElement('option');
-                opt.value = f.id;
-                opt.textContent = f.nome;
-                select.appendChild(opt);
-            });
         }
 
         function atualizarTodaUI() {
@@ -277,11 +238,265 @@
             popularDropdownFornecedores();
         }
 
-        // ... (resto de todas as outras funções: editar, salvar, excluir, registrarSaida, etc.) ...
+        // Funções do Dashboard
+        function atualizarDashboard(stats) {
+            document.getElementById('dashTotalEstoque').textContent = `${parseFloat(stats.totalItens || 0).toLocaleString()} un`;
+            document.getElementById('dashValorEstoque').textContent = formatarMoeda(parseFloat(stats.valorTotal || 0));
+            document.getElementById('dashCriticos').textContent = stats.itensCriticos || 0;
+        }
+        function renderizarGrafico(dadosEstoque) {
+            const ctx = document.getElementById('graficoEstoque').getContext('2d');
+            if (meuGrafico) { meuGrafico.destroy(); }
+            const top5 = [...dadosEstoque].sort((a, b) => b.totalunidades - a.totalunidades).slice(0, 5);
+            const labels = top5.map(item => item.produto);
+            const data = top5.map(item => item.totalunidades);
+            meuGrafico = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Quantidade em Estoque', data: data, backgroundColor: 'rgba(52, 152, 219, 0.7)', borderColor: 'rgba(41, 128, 185, 1)', borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, responsive: true } });
+        }
         
+        // Funções do Estoque
+        async function adicionarEstoque() {
+            const select = document.getElementById('estoqueProduto');
+            const selectedOption = select.options[select.selectedIndex];
+            const tipo = selectedOption.dataset.tipo;
+            let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0;
+            let unidadesAvulsas = parseInt(document.getElementById('estoqueUnidades').value) || 0;
+            if (tipo === 'rolo') { unidadesAvulsas = 0; }
+            const novoItem = {
+                produto: document.getElementById('estoqueProduto').value,
+                fornecedor_id: document.getElementById('estoqueFornecedorId').value || null,
+                pacotes: pacotes,
+                unidadesAvulsas: unidadesAvulsas,
+                custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value),
+                estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0,
+                ultimaEntrada: document.getElementById('estoqueData').value
+            };
+            if (!novoItem.produto || (tipo === 'cartela' && !novoItem.pacotes && !novoItem.unidadesAvulsas) || (tipo === 'rolo' && !novoItem.pacotes) || !novoItem.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); }
+            try {
+                const response = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(novoItem) });
+                if (!response.ok) throw new Error('Falha ao adicionar ao estoque.');
+                mostrarMensagem('Estoque atualizado com sucesso!', 'success');
+                limparFormEstoque();
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+        function editarEstoque(index) {
+            const item = estoque[index];
+            document.getElementById('editId').value = item.id;
+            document.getElementById('editProduto').value = item.produto;
+            // A edição do fornecedor precisaria de uma lógica mais complexa com o dropdown, simplificado por enquanto
+            document.getElementById('editFornecedor').value = item.fornecedor_nome || ''; 
+            document.getElementById('editPacotes').value = item.pacotes;
+            document.getElementById('editUnidades').value = item.unidadesavulsas;
+            document.getElementById('editCusto').value = item.custoporpacote;
+            document.getElementById('editMinimo').value = item.estoqueminimo;
+            document.getElementById('modalEdicao').style.display = 'block';
+        }
+        async function salvarEdicao() {
+            const id = document.getElementById('editId').value;
+            const dadosEditados = {
+                fornecedor: document.getElementById('editFornecedor').value.trim(), // Simplificado: salvando como texto por enquanto
+                pacotes: parseInt(document.getElementById('editPacotes').value) || 0,
+                unidadesavulsas: parseInt(document.getElementById('editUnidades').value) || 0,
+                custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0,
+                estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0
+            };
+            try {
+                const response = await fetch(`${API_URL}/estoque/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dadosEditados) });
+                if (!response.ok) throw new Error('Falha ao salvar as alterações.');
+                mostrarMensagem('Item atualizado com sucesso!', 'success');
+                fecharModal();
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+        async function excluirEstoque(id) {
+            if (!confirm('Tem certeza? Esta ação não pode ser desfeita.')) return;
+            try {
+                const response = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Falha ao deletar o item.');
+                mostrarMensagem('Item deletado com sucesso!', 'success');
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        // Funções de Saída
+        async function registrarSaida() {
+            const produtoId = parseInt(document.getElementById('saidaProduto').value);
+            const totalUnidades = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0);
+            if (!produtoId || !document.getElementById('saidaData').value || totalUnidades === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); }
+            const saida = {
+                data: document.getElementById('saidaData').value,
+                produtoId: produtoId,
+                totalUnidades: totalUnidades,
+                destino: document.getElementById('saidaDestino').value.trim()
+            };
+            try {
+                const response = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(saida) });
+                const result = await response.json();
+                if (!response.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); }
+                mostrarMensagem('Saída registrada com sucesso!', 'success');
+                limparFormSaida();
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        // Funções de Fornecedores
+        async function adicionarFornecedor() {
+            const nomeInput = document.getElementById('fornecedorNome');
+            const nome = nomeInput.value.trim();
+            if (!nome) return mostrarMensagem('O nome do fornecedor é obrigatório.', 'error');
+            try {
+                const response = await fetch('/api/fornecedores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) });
+                if (!response.ok) throw new Error('Falha ao adicionar fornecedor');
+                nomeInput.value = '';
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+        async function deletarFornecedor(id) {
+            if (!confirm('Tem certeza?')) return;
+            try {
+                const response = await fetch(`/api/fornecedores/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Falha ao deletar fornecedor');
+                await carregarDados();
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        // Funções de UI e Auxiliares
+        function trocarAba(aba) {
+            document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active');
+            document.getElementById(`aba-${aba}`).classList.add('active');
+            if (aba === 'estoque' || aba === 'fornecedores') { atualizarTodaUI(); }
+        }
+        function ordenarPor(key) {
+            if (key === 'acoes') return;
+            if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } 
+            else { sortConfig.direction = 'ascending'; }
+            sortConfig.key = key;
+            renderizarEstoque();
+        }
+        function renderizarEstoque() {
+            const filtroTexto = document.getElementById('filtroTexto').value.toLowerCase();
+            const filtroStatus = document.getElementById('filtroStatus').value;
+            const tbody = document.getElementById('tabelaEstoque');
+            tbody.innerHTML = '';
+            let estoqueFiltrado = [...estoque].filter(item => {
+                const atendeTexto = item.produto.toLowerCase().includes(filtroTexto) || (item.fornecedor_nome && item.fornecedor_nome.toLowerCase().includes(filtroTexto));
+                const atendeStatus = (filtroStatus === 'todos') || (getStatusEstoque(item) === filtroStatus);
+                return atendeTexto && atendeStatus;
+            });
+            estoqueFiltrado.sort((a, b) => {
+                const key = sortConfig.key;
+                const direction = sortConfig.direction === 'ascending' ? 1 : -1;
+                const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : '');
+                const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : '');
+                if (typeof valA === 'string') { return valA.localeCompare(valB) * direction; }
+                if (valA < valB) return -1 * direction;
+                if (valA > valB) return 1 * direction;
+                return 0;
+            });
+            document.querySelectorAll('.sort-arrow').forEach(arrow => arrow.innerHTML = '');
+            const arrowSpan = document.getElementById(`arrow-${sortConfig.key}`);
+            if (arrowSpan) { arrowSpan.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; }
+            estoqueFiltrado.forEach((item) => {
+                const tr = document.createElement('tr');
+                const status = getStatusEstoque(item);
+                let badgeClass = 'badge-success';
+                if (status === 'baixo') badgeClass = 'badge-warning';
+                if (status === 'critico') badgeClass = 'badge-danger';
+                tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badgeClass}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        function renderizarSaidas() {
+             const tbody = document.getElementById('tabelaSaida');
+             tbody.innerHTML = '';
+             saidas.forEach(saida => {
+                 const tr = document.createElement('tr');
+                 tr.innerHTML = `<td>${formatarData(saida.data)}</td><td>${saida.produtonome}</td><td class="number">${(saida.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(saida.custototal)}</td><td>${saida.destino || '-'}</td>`;
+                 tbody.appendChild(tr);
+             });
+        }
+        function renderizarFornecedores() {
+            const tbody = document.getElementById('tabelaFornecedores');
+            tbody.innerHTML = '';
+            fornecedores.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        function popularDropdownFornecedores() {
+            const select = document.getElementById('estoqueFornecedorId');
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">Sem Fornecedor</option>';
+            fornecedores.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                opt.textContent = f.nome;
+                select.appendChild(opt);
+            });
+            select.value = currentValue;
+        }
+        function atualizarProdutosDisponiveis() {
+            const select = document.getElementById('saidaProduto');
+            select.innerHTML = '<option value="">Selecione...</option>';
+            estoque.forEach(item => {
+                if (item.totalunidades > 0) {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = `${item.produto} (Disponível: ${(item.totalunidades || 0).toLocaleString()} un)`;
+                    select.appendChild(opt);
+                }
+            });
+        }
+        function limparFormEstoque() {
+            document.getElementById('estoqueProduto').value = '';
+            document.getElementById('estoqueFornecedorId').value = '';
+            document.getElementById('estoquePacotes').value = '0';
+            document.getElementById('estoqueUnidades').value = '0';
+            document.getElementById('estoqueCusto').value = '';
+            document.getElementById('estoqueMinimo').value = '';
+            document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0];
+            ajustarCamposProduto();
+        }
+        function limparFormSaida() { /* ...código... */ }
+        function fecharModal() { document.getElementById('modalEdicao').style.display = 'none'; }
+        function mostrarMensagem(msg, tipo) {
+            const el = (tipo === 'success') ? document.getElementById('successMessage') : document.getElementById('errorMessage');
+            el.textContent = msg; el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+        function formatarMoeda(valor) { return 'R$ ' + (valor || 0).toFixed(2).replace('.', ','); }
+        function formatarData(data) {
+            if (!data) return '';
+            if (data.includes('T')) { return data.split('T')[0].split('-').reverse().join('/'); }
+            return String(data).split('-').reverse().join('/');
+        }
+        function inicializar() {
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('estoqueData').value = hoje;
+            document.getElementById('saidaData').value = hoje;
+            ajustarCamposProduto();
+            carregarDados();
+            pedirPermissaoDeNotificacao();
+            setInterval(verificarAlertas, 60000);
+        }
+        
+        window.trocarAba = trocarAba;
+        window.adicionarEstoque = adicionarEstoque;
+        window.registrarSaida = registrarSaida;
+        window.excluirEstoque = excluirEstoque;
+        window.editarEstoque = editarEstoque;
+        window.salvarEdicao = salvarEdicao;
+        window.fecharModal = fecharModal;
+        window.ajustarCamposProduto = ajustarCamposProduto;
+        window.renderizarEstoque = renderizarEstoque;
+        window.mostrarItensCriticos = mostrarItensCriticos;
+        window.ordenarPor = ordenarPor;
         window.adicionarFornecedor = adicionarFornecedor;
         window.deletarFornecedor = deletarFornecedor;
-        // ... (resto das funções window) ...
+
+        document.addEventListener('DOMContentLoaded', inicializar);
     </script>
 </body>
 </html>

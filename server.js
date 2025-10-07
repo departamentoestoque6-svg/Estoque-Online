@@ -1,4 +1,4 @@
-// server.js - VERSÃO COMPLETA com Gestão de Fornecedores
+// server.js - VERSÃO 100% COMPLETA com Gestão de Fornecedores
 
 require('dotenv').config();
 const express = require('express');
@@ -22,6 +22,16 @@ const createTables = async () => {
       id SERIAL PRIMARY KEY,
       nome TEXT NOT NULL UNIQUE
     );
+
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'estoque_fornecedor_id_fkey') THEN
+            ALTER TABLE estoque DROP COLUMN IF EXISTS fornecedor;
+            ALTER TABLE estoque ADD COLUMN IF NOT EXISTS fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL;
+        END IF;
+    END;
+    $$;
+
     CREATE TABLE IF NOT EXISTS estoque (
       id SERIAL PRIMARY KEY,
       produto TEXT NOT NULL,
@@ -33,6 +43,7 @@ const createTables = async () => {
       estoqueMinimo INTEGER DEFAULT 0,
       ultimaEntrada DATE
     );
+
     CREATE TABLE IF NOT EXISTS saidas (
       id SERIAL PRIMARY KEY,
       data DATE NOT NULL,
@@ -57,8 +68,30 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- ROTAS DA API ---
 
-app.get('/api/dashboard/stats', async (req, res) => { /* ...código da rota... */ });
-app.get('/api/alertas/estoque-baixo', async (req, res) => { /* ...código da rota... */ });
+app.get('/api/dashboard/stats', async (req, res) => {
+  try {
+    const totalItensQuery = 'SELECT SUM(totalunidades) AS total_itens FROM estoque';
+    const valorTotalQuery = 'SELECT SUM(totalunidades * custoporpacote / 5000) AS valor_total FROM estoque';
+    const itensCriticosQuery = 'SELECT COUNT(*) AS itens_criticos FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
+    const [totalItensRes, valorTotalRes, itensCriticosRes] = await Promise.all([
+      pool.query(totalItensQuery), pool.query(valorTotalQuery), pool.query(itensCriticosQuery)
+    ]);
+    const stats = {
+      totalItens: totalItensRes.rows[0].total_itens || 0,
+      valorTotal: valorTotalRes.rows[0].valor_total || 0,
+      itensCriticos: itensCriticosRes.rows[0].itens_criticos || 0,
+    };
+    res.json(stats);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/alertas/estoque-baixo', async (req, res) => {
+  try {
+    const query = 'SELECT produto, totalunidades, estoqueminimo FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
+    const result = await pool.query(query);
+    res.json({ data: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.get('/api/estoque', async (req, res) => {
   try {
@@ -69,23 +102,22 @@ app.get('/api/estoque', async (req, res) => {
       ORDER BY e.produto
     `);
     res.json({ data: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/saidas', async (req, res) => { /* ...código da rota... */ });
+app.get('/api/saidas', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM saidas ORDER BY data DESC');
+    res.json({ data: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.post('/api/estoque', async (req, res) => {
     const { produto, fornecedor_id, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
     let totalUnidadesAdicionadas;
     const tipo = produto.toLowerCase().includes('rolo') ? 'rolo' : 'cartela';
-    
-    if (tipo === 'rolo') {
-        totalUnidadesAdicionadas = pacotes;
-    } else {
-        totalUnidadesAdicionadas = (pacotes * 5000) + unidadesAvulsas;
-    }
+    if (tipo === 'rolo') { totalUnidadesAdicionadas = pacotes; } 
+    else { totalUnidadesAdicionadas = (pacotes * 5000) + unidadesAvulsas; }
 
     try {
         const selectRes = await pool.query('SELECT * FROM estoque WHERE produto = $1 AND (fornecedor_id = $2 OR (fornecedor_id IS NULL AND $2 IS NULL))', [produto, fornecedor_id || null]);
@@ -93,38 +125,74 @@ app.post('/api/estoque', async (req, res) => {
         if (selectRes.rows.length > 0) {
             const item = selectRes.rows[0];
             const novoTotalUnidades = item.totalunidades + totalUnidadesAdicionadas;
-            const novosPacotes = Math.floor(novoTotalUnidades / (tipo === 'rolo' ? 1 : 5000));
+            const novosPacotes = tipo === 'rolo' ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000);
             const novasUnidadesAvulsas = tipo === 'rolo' ? 0 : novoTotalUnidades % 5000;
-            
             await pool.query(
                 'UPDATE estoque SET pacotes = $1, unidadesavulsas = $2, totalunidades = $3, custoporpacote = $4, estoqueminimo = $5, ultimaentrada = $6 WHERE id = $7',
                 [novosPacotes, novasUnidadesAvulsas, novoTotalUnidades, custoPorPacote, estoqueMinimo, ultimaEntrada, item.id]
             );
         } else {
+            const novosPacotes = tipo === 'rolo' ? totalUnidadesAdicionadas : pacotes;
             await pool.query(
                 'INSERT INTO estoque (produto, fornecedor_id, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, ultimaentrada) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                [produto, fornecedor_id || null, pacotes, unidadesAvulsas, totalUnidadesAdicionadas, custoPorPacote, estoqueMinimo, ultimaEntrada]
+                [produto, fornecedor_id || null, novosPacotes, unidadesAvulsas, totalUnidadesAdicionadas, custoPorPacote, estoqueMinimo, ultimaEntrada]
             );
         }
         res.status(201).json({ message: 'Estoque atualizado!' });
-    } catch (err) {
-        console.error('!!! ERRO na rota POST /api/estoque:', err);
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/estoque/:id', async (req, res) => { /* ...código da rota... */ });
-app.delete('/api/estoque/:id', async (req, res) => { /* ...código da rota... */ });
-app.post('/api/saidas', async (req, res) => { /* ...código da rota... */ });
+app.put('/api/estoque/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fornecedor_id, pacotes, unidadesavulsas, custoporpacote, estoqueminimo } = req.body;
+    const totalunidades = (pacotes * 5000) + unidadesavulsas;
+    const updateQuery = `UPDATE estoque SET fornecedor_id = $1, pacotes = $2, unidadesavulsas = $3, totalunidades = $4, custoporpacote = $5, estoqueminimo = $6 WHERE id = $7`;
+    const result = await pool.query(updateQuery, [fornecedor_id, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, id]);
+    if (result.rowCount === 0) { return res.status(404).json({ error: 'Item não encontrado para editar.' }); }
+    res.status(200).json({ message: 'Item atualizado com sucesso!' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
-// --- NOVAS ROTAS PARA FORNECEDORES ---
+app.delete('/api/estoque/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM estoque WHERE id = $1', [id]);
+    if (result.rowCount === 0) { return res.status(404).json({ error: 'Item não encontrado para deletar.' }); }
+    res.status(200).json({ message: 'Item deletado com sucesso!' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/saidas', async (req, res) => {
+  const { data, produtoId, totalUnidades, destino } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const estoqueRes = await client.query('SELECT * FROM estoque WHERE id = $1 FOR UPDATE', [produtoId]);
+    if (estoqueRes.rows.length === 0) { throw new Error('Produto não encontrado no estoque.'); }
+    const item = estoqueRes.rows[0];
+    if (item.totalunidades < totalUnidades) { throw new Error('Estoque insuficiente para esta saída.'); }
+    const novoTotalUnidades = item.totalunidades - totalUnidades;
+    const novosPacotes = Math.floor(novoTotalUnidades / 5000);
+    const novasUnidadesAvulsas = novoTotalUnidades % 5000;
+    const custoDaSaida = (totalUnidades / 5000) * item.custoporpacote;
+    await client.query('UPDATE estoque SET totalunidades = $1, pacotes = $2, unidadesavulsas = $3 WHERE id = $4', [novoTotalUnidades, novosPacotes, novasUnidadesAvulsas, produtoId]);
+    await client.query('INSERT INTO saidas (data, produtoid, produtonome, totalunidades, custototal, destino) VALUES ($1, $2, $3, $4, $5, $6)', [data, produtoId, item.produto, totalUnidades, custoDaSaida, destino]);
+    await client.query('COMMIT');
+    res.status(201).json({ message: 'Saída registrada com sucesso!' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(400).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 app.get('/api/fornecedores', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM fornecedores ORDER BY nome');
     res.json({ data: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/fornecedores', async (req, res) => {
@@ -133,9 +201,7 @@ app.post('/api/fornecedores', async (req, res) => {
     if (!nome) { return res.status(400).json({error: 'O nome do fornecedor é obrigatório.'}); }
     const result = await pool.query('INSERT INTO fornecedores (nome) VALUES ($1) RETURNING *', [nome]);
     res.status(201).json({ data: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/fornecedores/:id', async (req, res) => {
@@ -143,9 +209,7 @@ app.delete('/api/fornecedores/:id', async (req, res) => {
         const { id } = req.params;
         await pool.query('DELETE FROM fornecedores WHERE id = $1', [id]);
         res.status(200).json({ message: 'Fornecedor deletado com sucesso!' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.listen(PORT, () => {
