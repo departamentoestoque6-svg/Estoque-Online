@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA com Gestão de Fornecedores
+// server.js - VERSÃO 100% COMPLETA com Rotas de Relatórios
 
 require('dotenv').config();
 const express = require('express');
@@ -146,7 +146,9 @@ app.put('/api/estoque/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { fornecedor_id, pacotes, unidadesavulsas, custoporpacote, estoqueminimo } = req.body;
-    const totalunidades = (pacotes * 5000) + unidadesavulsas;
+    const itemInfo = await pool.query('SELECT produto FROM estoque WHERE id = $1', [id]);
+    const tipo = itemInfo.rows[0].produto.toLowerCase().includes('rolo') ? 'rolo' : 'cartela';
+    const totalunidades = tipo === 'rolo' ? pacotes : (pacotes * 5000) + unidadesavulsas;
     const updateQuery = `UPDATE estoque SET fornecedor_id = $1, pacotes = $2, unidadesavulsas = $3, totalunidades = $4, custoporpacote = $5, estoqueminimo = $6 WHERE id = $7`;
     const result = await pool.query(updateQuery, [fornecedor_id, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, id]);
     if (result.rowCount === 0) { return res.status(404).json({ error: 'Item não encontrado para editar.' }); }
@@ -172,10 +174,11 @@ app.post('/api/saidas', async (req, res) => {
     if (estoqueRes.rows.length === 0) { throw new Error('Produto não encontrado no estoque.'); }
     const item = estoqueRes.rows[0];
     if (item.totalunidades < totalUnidades) { throw new Error('Estoque insuficiente para esta saída.'); }
+    const tipo = item.produto.toLowerCase().includes('rolo') ? 'rolo' : 'cartela';
     const novoTotalUnidades = item.totalunidades - totalUnidades;
-    const novosPacotes = Math.floor(novoTotalUnidades / 5000);
-    const novasUnidadesAvulsas = novoTotalUnidades % 5000;
-    const custoDaSaida = (totalUnidades / 5000) * item.custoporpacote;
+    const novosPacotes = tipo === 'rolo' ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000);
+    const novasUnidadesAvulsas = tipo === 'rolo' ? 0 : novoTotalUnidades % 5000;
+    const custoDaSaida = tipo === 'rolo' ? totalUnidades * item.custoporpacote : (totalUnidades / 5000) * item.custoporpacote;
     await client.query('UPDATE estoque SET totalunidades = $1, pacotes = $2, unidadesavulsas = $3 WHERE id = $4', [novoTotalUnidades, novosPacotes, novasUnidadesAvulsas, produtoId]);
     await client.query('INSERT INTO saidas (data, produtoid, produtonome, totalunidades, custototal, destino) VALUES ($1, $2, $3, $4, $5, $6)', [data, produtoId, item.produto, totalUnidades, custoDaSaida, destino]);
     await client.query('COMMIT');
@@ -211,6 +214,45 @@ app.delete('/api/fornecedores/:id', async (req, res) => {
         res.status(200).json({ message: 'Fornecedor deletado com sucesso!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// --- NOVAS ROTAS DE RELATÓRIOS ---
+app.get('/api/relatorios/valor-por-produto', async (req, res) => {
+  console.log('>>> ROTA GET /api/relatorios/valor-por-produto ACESSADA');
+  try {
+    const query = `
+      SELECT 
+        produto, 
+        totalunidades,
+        CASE
+          WHEN produto LIKE '%Rolo%' THEN totalunidades * custoporpacote
+          ELSE (totalunidades / 5000.0) * custoporpacote
+        END AS valor_total
+      FROM estoque
+      WHERE totalunidades > 0
+      ORDER BY produto;
+    `;
+    const result = await pool.query(query);
+    res.json({ data: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/relatorios/saidas-por-periodo', async (req, res) => {
+    console.log('>>> ROTA GET /api/relatorios/saidas-por-periodo ACESSADA');
+    const { de, ate } = req.query;
+    if (!de || !ate) {
+        return res.status(400).json({ error: 'As datas de início e fim são obrigatórias.' });
+    }
+    try {
+        const query = 'SELECT * FROM saidas WHERE data >= $1 AND data <= $2 ORDER BY data DESC';
+        const result = await pool.query(query, [de, ate]);
+        res.json({ data: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);

@@ -65,6 +65,7 @@
                 <button class="tab" onclick="trocarAba('estoque')">Estoque</button>
                 <button class="tab" onclick="trocarAba('saida')">Saída</button>
                 <button class="tab" onclick="trocarAba('fornecedores')">Fornecedores</button>
+                <button class="tab" onclick="trocarAba('relatorios')">Relatórios</button>
             </div>
             <div class="success-message" id="successMessage"></div>
             <div class="error-message" id="errorMessage"></div>
@@ -148,6 +149,31 @@
                         <thead><tr><th>Nome</th><th>Ações</th></tr></thead>
                         <tbody id="tabelaFornecedores"></tbody>
                     </table>
+                </div>
+            </div>
+            <div id="aba-relatorios" class="tab-content">
+                <div class="section">
+                    <h3>Relatório de Saídas por Período</h3>
+                    <div class="form-row">
+                        <div class="form-group"><label for="relatorioDe">De:</label><input type="date" id="relatorioDe"></div>
+                        <div class="form-group"><label for="relatorioAte">Até:</label><input type="date" id="relatorioAte"></div>
+                        <div class="form-group" style="justify-content: flex-end;"><button class="btn" onclick="gerarRelatorioSaidas()">Gerar Relatório</button></div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino</th></tr></thead>
+                            <tbody id="tabelaRelatorioSaidas"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="section">
+                    <h3>Relatório de Valor de Estoque por Produto</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>Produto</th><th>Total (un)</th><th>Valor Total em Estoque (R$)</th></tr></thead>
+                            <tbody id="tabelaRelatorioValor"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -284,9 +310,8 @@
             }
         }
         async function adicionarEstoque() {
-            const select = document.getElementById('estoqueProduto');
             const novoItem = {
-                produto: select.value,
+                produto: document.getElementById('estoqueProduto').value,
                 fornecedor_id: document.getElementById('estoqueFornecedorId').value || null,
                 pacotes: parseInt(document.getElementById('estoquePacotes').value) || 0,
                 unidadesAvulsas: parseInt(document.getElementById('estoqueUnidades').value) || 0,
@@ -388,7 +413,8 @@
             document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
             document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active');
             document.getElementById(`aba-${aba}`).classList.add('active');
-            if (['dashboard', 'estoque', 'saida', 'fornecedores'].includes(aba)) { atualizarTodaUI(); }
+            if (['dashboard', 'estoque', 'saida', 'fornecedores', 'relatorios'].includes(aba)) { atualizarTodaUI(); }
+            if (aba === 'relatorios') { carregarRelatorios(); }
         }
         function ordenarPor(key) {
             if (key === 'acoes') return;
@@ -474,6 +500,7 @@
             });
         }
 
+        // Funções de Limpeza e Auxiliares
         function limparFormEstoque() {
             document.getElementById('estoqueProduto').value = '';
             document.getElementById('estoqueFornecedorId').value = '';
@@ -494,7 +521,10 @@
         function fecharModal() { document.getElementById('modalEdicao').style.display = 'none'; }
         function mostrarMensagem(msg, tipo) {
             const el = (tipo === 'success') ? document.getElementById('successMessage') : document.getElementById('errorMessage');
-            el.textContent = msg; el.style.display = 'block';
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            el.textContent = msg;
+            el.style.display = 'block';
             setTimeout(() => { el.style.display = 'none'; }, 5000);
         }
         function formatarMoeda(valor) { return 'R$ ' + (valor || 0).toFixed(2).replace('.', ','); }
@@ -504,10 +534,46 @@
             return String(data).split('-').reverse().join('/');
         }
         
+        async function gerarRelatorioSaidas() {
+            const de = document.getElementById('relatorioDe').value;
+            const ate = document.getElementById('relatorioAte').value;
+            if (!de || !ate) { return mostrarMensagem('Por favor, selecione as duas datas.', 'error'); }
+            try {
+                const res = await fetch(`${API_URL}/relatorios/saidas-por-periodo?de=${de}&ate=${ate}`);
+                if (!res.ok) throw new Error('Falha ao gerar relatório de saídas.');
+                const result = await res.json();
+                const tbody = document.querySelector('#tabelaRelatorioSaidas tbody');
+                tbody.innerHTML = '';
+                result.data.forEach(saida => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${formatarData(saida.data)}</td><td>${saida.produtonome}</td><td class="number">${(saida.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(saida.custototal)}</td><td>${saida.destino || '-'}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        async function carregarRelatorios() {
+            try {
+                const res = await fetch(`${API_URL}/relatorios/valor-por-produto`);
+                if (!res.ok) throw new Error('Falha ao carregar relatório de valor.');
+                const result = await res.json();
+                const tbody = document.querySelector('#tabelaRelatorioValor tbody');
+                tbody.innerHTML = '';
+                result.data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${item.produto}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(parseFloat(item.valor_total))}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) { mostrarMensagem(error.message, 'error'); }
+        }
+
+        // Inicialização
         function inicializar() {
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('estoqueData').value = hoje;
             document.getElementById('saidaData').value = hoje;
+            document.getElementById('relatorioDe').value = hoje;
+            document.getElementById('relatorioAte').value = hoje;
             ajustarCamposProduto();
             carregarDados();
             pedirPermissaoDeNotificacao();
@@ -527,6 +593,7 @@
         window.ordenarPor = ordenarPor;
         window.adicionarFornecedor = adicionarFornecedor;
         window.deletarFornecedor = deletarFornecedor;
+        window.gerarRelatorioSaidas = gerarRelatorioSaidas;
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>
