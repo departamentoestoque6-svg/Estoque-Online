@@ -83,27 +83,7 @@
                 <div class="section">
                     <h3>Entrada de Estoque</h3>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="estoqueProduto">Produto <span style="color: red;">*</span></label>
-                            <select id="estoqueProduto" onchange="ajustarCamposProduto()">
-                                <option value="">Selecione...</option>
-                                <option data-tipo="rolo">Papel Adesivo</option>
-                                <option data-tipo="rolo">Poliester</option>
-                                <option data-tipo="rolo">Rolo de Ribbon</option>
-                                <option data-tipo="rolo">Rolo de Etiqueta Travanel</option>
-                                <option data-tipo="cartela">Conjunto Cartela Verde</option>
-                                <option data-tipo="cartela">Conjunto Cartela Branca</option>
-                                <option data-tipo="cartela">Cartela Brinco Trio Verde</option>
-                                <option data-tipo="cartela">Cartela Brinco Trio Branca</option>
-                                <option data-tipo="cartela">Conjunto Cartela Verde Quadrada</option>
-                                <option data-tipo="cartela">Cartela Capelinha</option>
-                                <option data-tipo="cartela">Cartela de Pulseira Verde</option>
-                                <option data-tipo="cartela">Cartela de Pulseira Branca</option>
-                                <option data-tipo="cartela">Cartela Quadrada Branca M de Brinco</option>
-                                <option data-tipo="cartela">Cartela Quadrada Verde M de Brinco</option>
-                                <option data-tipo="cartela">Cartela Quadrada Branca G de Brinco</option>
-                            </select>
-                        </div>
+                        <div class="form-group"><label for="estoqueProduto">Produto <span style="color: red;">*</span></label><select id="estoqueProduto" onchange="ajustarCamposProduto()"><option value="">Selecione...</option><option data-tipo="rolo">Papel Adesivo</option><option data-tipo="rolo">Poliester</option><option data-tipo="rolo">Rolo de Ribbon</option><option data-tipo="rolo">Rolo de Etiqueta Travanel</option><option data-tipo="cartela">Conjunto Cartela Verde</option><option data-tipo="cartela">Conjunto Cartela Branca</option><option data-tipo="cartela">Cartela Brinco Trio Verde</option><option data-tipo="cartela">Cartela Brinco Trio Branca</option><option data-tipo="cartela">Conjunto Cartela Verde Quadrada</option><option data-tipo="cartela">Cartela Capelinha</option><option data-tipo="cartela">Cartela de Pulseira Verde</option><option data-tipo="cartela">Cartela de Pulseira Branca</option><option data-tipo="cartela">Cartela Quadrada Branca M de Brinco</option><option data-tipo="cartela">Cartela Quadrada Verde M de Brinco</option><option data-tipo="cartela">Cartela Quadrada Branca G de Brinco</option></select></div>
                         <div class="form-group"><label for="estoqueFornecedorId">Fornecedor</label><select id="estoqueFornecedorId"><option value="">Sem Fornecedor</option></select></div>
                         <div class="form-group"><label for="estoquePacotes" id="labelPacotes">Pacotes <span style="color: red;">*</span></label><input type="number" id="estoquePacotes" placeholder="0" min="0" value="0"></div>
                         <div class="form-group" id="groupUnidadesAvulsas"><label for="estoqueUnidades">Unidades Avulsas</label><input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0"></div>
@@ -279,6 +259,11 @@
         }
         
         // Funções do Formulário e Estoque
+        function getStatusEstoque(item) {
+            if (item.estoqueminimo > 0 && item.totalunidades <= item.estoqueminimo) { return 'critico'; }
+            if (item.totalunidades < 5000 && item.totalunidades > 0 && !item.produto.toLowerCase().includes('rolo')) { return 'baixo'; }
+            return 'ok';
+        }
         function ajustarCamposProduto() {
             const select = document.getElementById('estoqueProduto');
             const selectedOption = select.options[select.selectedIndex];
@@ -299,8 +284,9 @@
             }
         }
         async function adicionarEstoque() {
+            const select = document.getElementById('estoqueProduto');
             const novoItem = {
-                produto: document.getElementById('estoqueProduto').value,
+                produto: select.value,
                 fornecedor_id: document.getElementById('estoqueFornecedorId').value || null,
                 pacotes: parseInt(document.getElementById('estoquePacotes').value) || 0,
                 unidadesAvulsas: parseInt(document.getElementById('estoqueUnidades').value) || 0,
@@ -488,7 +474,6 @@
             });
         }
 
-        // Funções de Limpeza e Auxiliares
         function limparFormEstoque() {
             document.getElementById('estoqueProduto').value = '';
             document.getElementById('estoqueFornecedorId').value = '';
@@ -499,7 +484,13 @@
             document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0];
             ajustarCamposProduto();
         }
-        function limparFormSaida() { /* ...código... */ }
+        function limparFormSaida() {
+            document.getElementById('saidaProduto').value = '';
+            document.getElementById('saidaData').value = new Date().toISOString().split('T')[0];
+            document.getElementById('saidaPacotes').value = '0';
+            document.getElementById('saidaUnidades').value = '0';
+            document.getElementById('saidaDestino').value = '';
+        }
         function fecharModal() { document.getElementById('modalEdicao').style.display = 'none'; }
         function mostrarMensagem(msg, tipo) {
             const el = (tipo === 'success') ? document.getElementById('successMessage') : document.getElementById('errorMessage');
@@ -513,7 +504,6 @@
             return String(data).split('-').reverse().join('/');
         }
         
-        // Inicialização
         function inicializar() {
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('estoqueData').value = hoje;
