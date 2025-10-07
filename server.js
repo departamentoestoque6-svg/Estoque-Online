@@ -5,6 +5,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,35 +18,10 @@ const pool = new Pool({
 
 const createTables = async () => {
   const queryText = `
-    CREATE TABLE IF NOT EXISTS fornecedores (
-      id SERIAL PRIMARY KEY,
-      nome TEXT NOT NULL UNIQUE
-    );
-    CREATE TABLE IF NOT EXISTS estoque (
-      id SERIAL PRIMARY KEY,
-      produto TEXT NOT NULL,
-      fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL,
-      pacotes INTEGER DEFAULT 0,
-      unidadesAvulsas INTEGER DEFAULT 0,
-      totalUnidades INTEGER DEFAULT 0,
-      custoPorPacote REAL DEFAULT 0,
-      estoqueMinimo INTEGER DEFAULT 0,
-      ultimaEntrada DATE
-    );
-    CREATE TABLE IF NOT EXISTS saidas (
-      id SERIAL PRIMARY KEY,
-      data DATE NOT NULL,
-      produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
-      produtoNome TEXT NOT NULL,
-      totalUnidades INTEGER NOT NULL,
-      custoTotal REAL NOT NULL,
-      destino TEXT
-    );
-    CREATE TABLE IF NOT EXISTS usuarios (
-      id SERIAL PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      senha TEXT NOT NULL
-    );
+    CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );
+    CREATE TABLE IF NOT EXISTS estoque ( id SERIAL PRIMARY KEY, produto TEXT NOT NULL, fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL, pacotes INTEGER DEFAULT 0, unidadesAvulsas INTEGER DEFAULT 0, totalUnidades INTEGER DEFAULT 0, custoPorPacote REAL DEFAULT 0, estoqueMinimo INTEGER DEFAULT 0, ultimaEntrada DATE );
+    CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
+    CREATE TABLE IF NOT EXISTS usuarios ( id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, senha TEXT NOT NULL );
     CREATE TABLE IF NOT EXISTS uso_producao (
       id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
@@ -65,29 +42,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- MIDDLEWARE DE AUTENTICAÇÃO (O "GUARDA-COSTAS") ---
+// --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const protegerRota = (req, res, next) => {
-    // Para simplificar, vamos desativar a proteção enquanto desenvolvemos a nova feature
-    next();
+    next(); // Proteção desativada por enquanto
 };
 
-
-// --- ROTAS DE AUTENTICAÇÃO (Públicas) ---
+// --- ROTAS DE AUTENTICAÇÃO ---
 app.post('/api/usuarios/registrar', async (req, res) => {
     try {
         const { email, senha } = req.body;
         if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
         const hashedPassword = await bcrypt.hash(senha, 10);
-        const newUser = await pool.query(
-          "INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email",
-          [email, hashedPassword]
-        );
+        const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
         res.status(201).json(newUser.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: 'Email já pode estar em uso ou outro erro ocorreu.' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Email já pode estar em uso ou outro erro ocorreu.' }); }
 });
-
 app.post('/api/usuarios/login', async (req, res) => {
   try {
     const { email, senha } = req.body;
@@ -98,11 +67,8 @@ app.post('/api/usuarios/login', async (req, res) => {
     if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
     const accessToken = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1d' });
     res.json({ accessToken: accessToken });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 
 // --- ROTAS DA API ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
@@ -110,14 +76,8 @@ app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
     const totalItensQuery = 'SELECT SUM(totalunidades) AS total_itens FROM estoque';
     const valorTotalQuery = 'SELECT SUM(CASE WHEN produto ILIKE \'%rolo%\' THEN totalunidades * custoporpacote ELSE (totalunidades / 5000.0) * custoporpacote END) AS valor_total FROM estoque';
     const itensCriticosQuery = 'SELECT COUNT(*) AS itens_criticos FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
-    const [totalItensRes, valorTotalRes, itensCriticosRes] = await Promise.all([
-      pool.query(totalItensQuery), pool.query(valorTotalQuery), pool.query(itensCriticosQuery)
-    ]);
-    const stats = {
-      totalItens: totalItensRes.rows[0].total_itens || 0,
-      valorTotal: valorTotalRes.rows[0].valor_total || 0,
-      itensCriticos: itensCriticosRes.rows[0].itens_criticos || 0,
-    };
+    const [totalItensRes, valorTotalRes, itensCriticosRes] = await Promise.all([ pool.query(totalItensQuery), pool.query(valorTotalQuery), pool.query(itensCriticosQuery) ]);
+    const stats = { totalItens: totalItensRes.rows[0].total_itens || 0, valorTotal: valorTotalRes.rows[0].valor_total || 0, itensCriticos: itensCriticosRes.rows[0].itens_criticos || 0 };
     res.json(stats);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -130,12 +90,7 @@ app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
 });
 app.get('/api/estoque', protegerRota, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT e.*, f.nome AS fornecedor_nome 
-      FROM estoque e
-      LEFT JOIN fornecedores f ON e.fornecedor_id = f.id
-      ORDER BY e.produto
-    `);
+    const result = await pool.query(`SELECT e.*, f.nome AS fornecedor_nome FROM estoque e LEFT JOIN fornecedores f ON e.fornecedor_id = f.id ORDER BY e.produto`);
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -255,8 +210,36 @@ app.get('/api/relatorios/saidas-por-periodo', protegerRota, async (req, res) => 
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
+    try {
+        const query = `
+            SELECT up.produto_nome, up.data_inicio, up.data_fim, up.etiquetas_impressas, e.custoporpacote
+            FROM uso_producao up
+            JOIN estoque e ON up.estoque_id = e.id
+            WHERE up.status = 'Finalizado' ORDER BY up.data_fim DESC;
+        `;
+        const result = await pool.query(query);
+        const calcularDiasUteis = (inicio, fim) => {
+            let dias = 0; let dataAtual = new Date(inicio); const dataFim = new Date(fim);
+            while (dataAtual <= dataFim) {
+                const diaDaSemana = dataAtual.getUTCDay();
+                if (diaDaSemana !== 0) { dias++; }
+                dataAtual.setUTCDate(dataAtual.getUTCDate() + 1);
+            }
+            return dias > 0 ? dias : 1;
+        };
+        const relatorioProcessado = result.rows.map(item => {
+            const diasUteis = calcularDiasUteis(item.data_inicio, item.data_fim);
+            const custoTotalDoRolo = item.custoporpacote;
+            const custoPorDia = custoTotalDoRolo / diasUteis;
+            const mediaEtiquetasPorDia = item.etiquetas_impressas ? item.etiquetas_impressas / diasUteis : null;
+            return { ...item, dias_uteis: diasUteis, custo_dia: custoPorDia, media_etiquetas_dia: mediaEtiquetasPorDia };
+        });
+        res.json({ data: relatorioProcessado });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
-// --- NOVAS ROTAS PARA CONTROLE DE PRODUÇÃO ---
+// --- ROTAS DE PRODUÇÃO ---
 app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     const { estoque_id, data_inicio } = req.body;
     const client = await pool.connect();
@@ -284,12 +267,10 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
 });
 app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
     try {
-        const query = `SELECT id, data_inicio, produto_nome FROM uso_producao WHERE status = 'Em Uso' ORDER BY data_inicio ASC`;
+        const query = `SELECT up.id, up.data_inicio, e.produto AS produto_nome FROM uso_producao up JOIN estoque e ON up.estoque_id = e.id WHERE up.status = 'Em Uso' ORDER BY up.data_inicio ASC`;
         const result = await pool.query(query);
         res.json({ data: result.rows });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     const { id } = req.params;
@@ -300,9 +281,7 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
         const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
         res.status(200).json({ data: result.rows[0] });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.listen(PORT, () => {

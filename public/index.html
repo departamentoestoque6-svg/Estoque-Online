@@ -152,7 +152,7 @@
                     </table>
                 </div>
             </div>
-            <div id="aba-producao" class="tab-content">
+             <div id="aba-producao" class="tab-content">
                 <div class="section">
                     <h3>Iniciar Uso de Rolo em Produção</h3>
                     <div class="form-row">
@@ -181,6 +181,15 @@
                         <table id="tabelaRelatorioSaidas">
                             <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino</th></tr></thead>
                             <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="section">
+                    <h3>Histórico de Rolos Finalizados</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>Produto</th><th>Data Início</th><th>Data Fim</th><th>Dias Úteis</th><th>Custo/Dia (R$)</th><th>Média Etiq./Dia</th></tr></thead>
+                            <tbody id="tabelaHistoricoUso"></tbody>
                         </table>
                     </div>
                 </div>
@@ -283,8 +292,11 @@
         async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const res = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(saida) }); const result = await res.json(); if (!res.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function adicionarFornecedor(){ const nomeIn = document.getElementById('fornecedorNome'); const nome = nomeIn.value.trim(); if (!nome) return mostrarMensagem('O nome do fornecedor é obrigatório.', 'error'); try { const res = await fetch('/api/fornecedores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }) }); if (!res.ok) throw new Error('Falha ao adicionar fornecedor'); nomeIn.value = ''; await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function deletarFornecedor(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`/api/fornecedores/${id}`, { method: 'DELETE' }); if (!res.ok) throw new Error('Falha ao deletar fornecedor'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
-        async function gerarRelatorioSaidas(){ const de = document.getElementById('relatorioDe').value; const ate = document.getElementById('relatorioAte').value; if (!de || !ate) { return mostrarMensagem('Selecione as duas datas.', 'error'); } try { const res = await fetch(`${API_URL}/relatorios/saidas-por-periodo?de=${de}&ate=${ate}`); if (!res.ok) throw new Error('Falha ao gerar relatório.'); const result = await res.json(); const tbody = document.querySelector('#tabelaRelatorioSaidas tbody'); tbody.innerHTML = ''; result.data.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); } catch (e) { mostrarMensagem(e.message, 'error'); } }
-        async function carregarRelatorios(){ try { const res = await fetch(`${API_URL}/relatorios/valor-por-produto`); if (!res.ok) throw new Error('Falha ao carregar relatório.'); const result = await res.json(); const tbody = document.querySelector('#tabelaRelatorioValor tbody'); tbody.innerHTML = ''; result.data.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto}</td><td class="number">${(i.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(parseFloat(i.valor_total))}</td>`; tbody.appendChild(tr); }); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function gerarRelatorioSaidas(){ const de = document.getElementById('relatorioDe').value; const ate = document.getElementById('relatorioAte').value; if (!de || !ate) { return mostrarMensagem('Selecione as duas datas.', 'error'); } try { const res = await fetch(`${API_URL}/relatorios/saidas-por-periodo?de=${de}&ate=${ate}`); if (!res.ok) throw new Error('Falha ao gerar relatório.'); const result = await res.json(); renderizarRelatorioSaidas(result.data); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function carregarRelatorios(){ try { const resValor = await fetch(`${API_URL}/relatorios/valor-por-produto`); if (!resValor.ok) throw new Error('Falha ao carregar relatório de valor.'); const resultValor = await resValor.json(); renderizarRelatorioValor(resultValor.data); const resHistorico = await fetch(`${API_URL}/relatorios/historico-uso`); if (!resHistorico.ok) throw new Error('Falha ao carregar histórico de uso.'); const resultHistorico = await resHistorico.json(); renderizarHistoricoUso(resultHistorico.data); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        function renderizarRelatorioSaidas(dados){ const tbody = document.querySelector('#tabelaRelatorioSaidas tbody'); tbody.innerHTML = ''; dados.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
+        function renderizarRelatorioValor(dados){ const tbody = document.querySelector('#tabelaRelatorioValor tbody'); tbody.innerHTML = ''; dados.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto}</td><td class="number">${(i.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(parseFloat(i.valor_total))}</td>`; tbody.appendChild(tr); }); }
+        function renderizarHistoricoUso(dados){ const tbody = document.getElementById('tabelaHistoricoUso'); tbody.innerHTML = ''; dados.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto_nome}</td><td>${formatarData(i.data_inicio)}</td><td>${formatarData(i.data_fim)}</td><td class="number">${i.dias_uteis}</td><td class="currency">${formatarMoeda(i.custo_dia)}</td><td class="number">${i.media_etiquetas_dia ? i.media_etiquetas_dia.toFixed(2) : 'N/A'}</td>`; tbody.appendChild(tr); }); }
         async function iniciarProducao(){ const data = { estoque_id: document.getElementById('producaoProduto').value, data_inicio: document.getElementById('producaoDataInicio').value }; if (!data.estoque_id || !data.data_inicio) return mostrarMensagem('Selecione um produto e a data de início.', 'error'); try { const res = await fetch('/api/producao/iniciar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await res.json(); if (!res.ok) throw new Error(result.error); mostrarMensagem('Uso de rolo iniciado!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         function finalizarProducao(id){ const item = emUso.find(i => i.id === id); if (!item) return; document.getElementById('finalizarId').value = item.id; document.getElementById('finalizarProduto').value = item.produto_nome; document.getElementById('finalizarDataFim').value = new Date().toISOString().split('T')[0]; const grpEtiquetas = document.getElementById('groupEtiquetasImpressas'); if (item.produto_nome.toLowerCase().includes('etiqueta')) { grpEtiquetas.style.display = 'block'; } else { grpEtiquetas.style.display = 'none'; } document.getElementById('modalFinalizarProducao').style.display = 'block'; }
         async function salvarFinalizacao(){ const id = document.getElementById('finalizarId').value; const data = { data_fim: document.getElementById('finalizarDataFim').value, etiquetas_impressas: parseInt(document.getElementById('finalizarEtiquetas').value) || null }; if (!data.data_fim) return mostrarMensagem('A data de finalização é obrigatória.', 'error'); try { const res = await fetch(`/api/producao/finalizar/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!res.ok) throw new Error('Falha ao finalizar uso.'); mostrarMensagem('Uso de rolo finalizado!', 'success'); fecharModalProducao(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
@@ -296,32 +308,10 @@
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
         function renderizarFornecedores(){ const tbody = document.getElementById('tabelaFornecedores'); tbody.innerHTML = ''; fornecedores.forEach(f => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
         function popularDropdownFornecedores(selectId, selValue = null){ const sel = document.getElementById(selectId); if (!sel) return; const curVal = sel.value; sel.innerHTML = '<option value="">Sem Fornecedor</option>'; fornecedores.forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = f.nome; sel.appendChild(opt); }); sel.value = selValue || curVal; }
-        function popularDropdownProducao() {
-            const select = document.getElementById('producaoProduto');
-            select.innerHTML = '<option value="">Selecione um rolo do estoque...</option>';
-            estoque.forEach(item => {
-                if (item.produto.toLowerCase().includes('rolo') && item.totalunidades > 0) {
-                    const opt = document.createElement('option');
-                    opt.value = item.id;
-                    opt.textContent = `${item.produto} (Disponível: ${item.totalunidades})`;
-                    select.appendChild(opt);
-                }
-            });
-        }
-        function renderizarProducaoEmUso() {
-            const tbody = document.getElementById('tabelaProducaoEmUso');
-            tbody.innerHTML = '';
-            emUso.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${item.produto_nome}</td>
-                    <td>${formatarData(item.data_inicio)}</td>
-                    <td><button class="btn-success" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="finalizarProducao(${item.id})">Finalizar Uso</button></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+        function popularDropdownProducao() { const sel = document.getElementById('producaoProduto'); sel.innerHTML = '<option value="">Selecione um rolo...</option>'; estoque.forEach(i => { if (i.produto.toLowerCase().includes('rolo') && i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${i.totalunidades})`; sel.appendChild(opt); } }); }
+        function renderizarProducaoEmUso() { const tbody = document.getElementById('tabelaProducaoEmUso'); tbody.innerHTML = ''; emUso.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto_nome}</td><td>${formatarData(i.data_inicio)}</td><td><button class="btn-success" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="finalizarProducao(${i.id})">Finalizar Uso</button></td>`; tbody.appendChild(tr); }); }
         function atualizarProdutosDisponiveis(){ const sel = document.getElementById('saidaProduto'); sel.innerHTML = '<option value="">Selecione...</option>'; estoque.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); }
+        
         function limparFormEstoque(){ document.getElementById('estoqueProduto').value = ''; document.getElementById('estoqueFornecedorId').value = ''; document.getElementById('estoquePacotes').value = '0'; document.getElementById('estoqueUnidades').value = '0'; document.getElementById('estoqueCusto').value = ''; document.getElementById('estoqueMinimo').value = ''; document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0]; ajustarCamposProduto(); }
         function limparFormSaida(){ document.getElementById('saidaProduto').value = ''; document.getElementById('saidaData').value = new Date().toISOString().split('T')[0]; document.getElementById('saidaPacotes').value = '0'; document.getElementById('saidaUnidades').value = '0'; document.getElementById('saidaDestino').value = ''; }
         
