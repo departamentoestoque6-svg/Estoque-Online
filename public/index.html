@@ -187,9 +187,9 @@
                 <div class="section">
                     <h3>Relatório de Valor de Estoque por Produto</h3>
                     <div class="table-container">
-                        <table>
+                        <table id="tabelaRelatorioValor">
                             <thead><tr><th>Produto</th><th>Total (un)</th><th>Valor Total em Estoque (R$)</th></tr></thead>
-                            <tbody id="tabelaRelatorioValor"></tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
@@ -296,6 +296,31 @@
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
         function renderizarFornecedores(){ const tbody = document.getElementById('tabelaFornecedores'); tbody.innerHTML = ''; fornecedores.forEach(f => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
         function popularDropdownFornecedores(selectId, selValue = null){ const sel = document.getElementById(selectId); if (!sel) return; const curVal = sel.value; sel.innerHTML = '<option value="">Sem Fornecedor</option>'; fornecedores.forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = f.nome; sel.appendChild(opt); }); sel.value = selValue || curVal; }
+        function popularDropdownProducao() {
+            const select = document.getElementById('producaoProduto');
+            select.innerHTML = '<option value="">Selecione um rolo do estoque...</option>';
+            estoque.forEach(item => {
+                if (item.produto.toLowerCase().includes('rolo') && item.totalunidades > 0) {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = `${item.produto} (Disponível: ${item.totalunidades})`;
+                    select.appendChild(opt);
+                }
+            });
+        }
+        function renderizarProducaoEmUso() {
+            const tbody = document.getElementById('tabelaProducaoEmUso');
+            tbody.innerHTML = '';
+            emUso.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.produto_nome}</td>
+                    <td>${formatarData(item.data_inicio)}</td>
+                    <td><button class="btn-success" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="finalizarProducao(${item.id})">Finalizar Uso</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
         function atualizarProdutosDisponiveis(){ const sel = document.getElementById('saidaProduto'); sel.innerHTML = '<option value="">Selecione...</option>'; estoque.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); }
         function limparFormEstoque(){ document.getElementById('estoqueProduto').value = ''; document.getElementById('estoqueFornecedorId').value = ''; document.getElementById('estoquePacotes').value = '0'; document.getElementById('estoqueUnidades').value = '0'; document.getElementById('estoqueCusto').value = ''; document.getElementById('estoqueMinimo').value = ''; document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0]; ajustarCamposProduto(); }
         function limparFormSaida(){ document.getElementById('saidaProduto').value = ''; document.getElementById('saidaData').value = new Date().toISOString().split('T')[0]; document.getElementById('saidaPacotes').value = '0'; document.getElementById('saidaUnidades').value = '0'; document.getElementById('saidaDestino').value = ''; }
