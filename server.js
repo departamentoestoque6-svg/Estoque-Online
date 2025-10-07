@@ -1,12 +1,10 @@
-// server.js - VERSÃO 100% COMPLETA com Controle de Produção
+// server.js - VERSÃO CORRIGIDA (sem código de login)
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,33 +40,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const protegerRota = (req, res, next) => {
     next(); // Proteção desativada por enquanto
 };
-
-// --- ROTAS DE AUTENTICAÇÃO ---
-app.post('/api/usuarios/registrar', async (req, res) => {
-    try {
-        const { email, senha } = req.body;
-        if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
-        const hashedPassword = await bcrypt.hash(senha, 10);
-        const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
-        res.status(201).json(newUser.rows[0]);
-    } catch (err) { res.status(500).json({ error: 'Email já pode estar em uso ou outro erro ocorreu.' }); }
-});
-app.post('/api/usuarios/login', async (req, res) => {
-  try {
-    const { email, senha } = req.body;
-    const userRes = await pool.query("SELECT * FROM usuarios WHERE email = $1", [email]);
-    if (userRes.rows.length === 0) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-    const user = userRes.rows[0];
-    const senhaValida = await bcrypt.compare(senha, user.senha);
-    if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ accessToken: accessToken });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
 
 // --- ROTAS DA API ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
@@ -281,7 +255,9 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
         const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
         res.status(200).json({ data: result.rows[0] });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.listen(PORT, () => {
