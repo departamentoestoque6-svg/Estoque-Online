@@ -160,18 +160,18 @@
                         <div class="form-group" style="justify-content: flex-end;"><button class="btn" onclick="gerarRelatorioSaidas()">Gerar Relatório</button></div>
                     </div>
                     <div class="table-container">
-                        <table>
+                        <table id="tabelaRelatorioSaidas">
                             <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino</th></tr></thead>
-                            <tbody id="tabelaRelatorioSaidas"></tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
                 <div class="section">
                     <h3>Relatório de Valor de Estoque por Produto</h3>
                     <div class="table-container">
-                        <table>
+                        <table id="tabelaRelatorioValor">
                             <thead><tr><th>Produto</th><th>Total (un)</th><th>Valor Total em Estoque (R$)</th></tr></thead>
-                            <tbody id="tabelaRelatorioValor"></tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
@@ -413,7 +413,7 @@
             document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
             document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active');
             document.getElementById(`aba-${aba}`).classList.add('active');
-            if (['dashboard', 'estoque', 'saida', 'fornecedores', 'relatorios'].includes(aba)) { atualizarTodaUI(); }
+            if (['dashboard', 'estoque', 'saida', 'fornecedores'].includes(aba)) { atualizarTodaUI(); }
             if (aba === 'relatorios') { carregarRelatorios(); }
         }
         function ordenarPor(key) {

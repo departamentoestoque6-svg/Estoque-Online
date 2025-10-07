@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA com Rotas de Relatórios
+// server.js - VERSÃO 100% COMPLETA com Relatórios
 
 require('dotenv').config();
 const express = require('express');
@@ -11,48 +11,14 @@ const PORT = process.env.PORT || 3000;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 });
 
 const createTables = async () => {
   const queryText = `
-    CREATE TABLE IF NOT EXISTS fornecedores (
-      id SERIAL PRIMARY KEY,
-      nome TEXT NOT NULL UNIQUE
-    );
-
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'estoque_fornecedor_id_fkey') THEN
-            ALTER TABLE estoque DROP COLUMN IF EXISTS fornecedor;
-            ALTER TABLE estoque ADD COLUMN IF NOT EXISTS fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL;
-        END IF;
-    END;
-    $$;
-
-    CREATE TABLE IF NOT EXISTS estoque (
-      id SERIAL PRIMARY KEY,
-      produto TEXT NOT NULL,
-      fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL,
-      pacotes INTEGER DEFAULT 0,
-      unidadesAvulsas INTEGER DEFAULT 0,
-      totalUnidades INTEGER DEFAULT 0,
-      custoPorPacote REAL DEFAULT 0,
-      estoqueMinimo INTEGER DEFAULT 0,
-      ultimaEntrada DATE
-    );
-
-    CREATE TABLE IF NOT EXISTS saidas (
-      id SERIAL PRIMARY KEY,
-      data DATE NOT NULL,
-      produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
-      produtoNome TEXT NOT NULL,
-      totalUnidades INTEGER NOT NULL,
-      custoTotal REAL NOT NULL,
-      destino TEXT
-    );
+    CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );
+    CREATE TABLE IF NOT EXISTS estoque ( id SERIAL PRIMARY KEY, produto TEXT NOT NULL, fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL, pacotes INTEGER DEFAULT 0, unidadesAvulsas INTEGER DEFAULT 0, totalUnidades INTEGER DEFAULT 0, custoPorPacote REAL DEFAULT 0, estoqueMinimo INTEGER DEFAULT 0, ultimaEntrada DATE );
+    CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
   `;
   try {
     await pool.query(queryText);
@@ -71,7 +37,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/dashboard/stats', async (req, res) => {
   try {
     const totalItensQuery = 'SELECT SUM(totalunidades) AS total_itens FROM estoque';
-    const valorTotalQuery = 'SELECT SUM(totalunidades * custoporpacote / 5000) AS valor_total FROM estoque';
+    const valorTotalQuery = 'SELECT SUM(CASE WHEN produto ILIKE \'%rolo%\' THEN totalunidades * custoporpacote ELSE (totalunidades / 5000.0) * custoporpacote END) AS valor_total FROM estoque';
     const itensCriticosQuery = 'SELECT COUNT(*) AS itens_criticos FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
     const [totalItensRes, valorTotalRes, itensCriticosRes] = await Promise.all([
       pool.query(totalItensQuery), pool.query(valorTotalQuery), pool.query(itensCriticosQuery)
@@ -114,29 +80,19 @@ app.get('/api/saidas', async (req, res) => {
 
 app.post('/api/estoque', async (req, res) => {
     const { produto, fornecedor_id, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
-    let totalUnidadesAdicionadas;
     const tipo = produto.toLowerCase().includes('rolo') ? 'rolo' : 'cartela';
-    if (tipo === 'rolo') { totalUnidadesAdicionadas = pacotes; } 
-    else { totalUnidadesAdicionadas = (pacotes * 5000) + unidadesAvulsas; }
-
+    const totalUnidadesAdicionadas = tipo === 'rolo' ? pacotes : (pacotes * 5000) + unidadesAvulsas;
     try {
         const selectRes = await pool.query('SELECT * FROM estoque WHERE produto = $1 AND (fornecedor_id = $2 OR (fornecedor_id IS NULL AND $2 IS NULL))', [produto, fornecedor_id || null]);
-        
         if (selectRes.rows.length > 0) {
             const item = selectRes.rows[0];
             const novoTotalUnidades = item.totalunidades + totalUnidadesAdicionadas;
             const novosPacotes = tipo === 'rolo' ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000);
             const novasUnidadesAvulsas = tipo === 'rolo' ? 0 : novoTotalUnidades % 5000;
-            await pool.query(
-                'UPDATE estoque SET pacotes = $1, unidadesavulsas = $2, totalunidades = $3, custoporpacote = $4, estoqueminimo = $5, ultimaentrada = $6 WHERE id = $7',
-                [novosPacotes, novasUnidadesAvulsas, novoTotalUnidades, custoPorPacote, estoqueMinimo, ultimaEntrada, item.id]
-            );
+            await pool.query('UPDATE estoque SET pacotes = $1, unidadesavulsas = $2, totalunidades = $3, custoporpacote = $4, estoqueminimo = $5, ultimaentrada = $6 WHERE id = $7', [novosPacotes, novasUnidadesAvulsas, novoTotalUnidades, custoPorPacote, estoqueMinimo, ultimaEntrada, item.id]);
         } else {
             const novosPacotes = tipo === 'rolo' ? totalUnidadesAdicionadas : pacotes;
-            await pool.query(
-                'INSERT INTO estoque (produto, fornecedor_id, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, ultimaentrada) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                [produto, fornecedor_id || null, novosPacotes, unidadesAvulsas, totalUnidadesAdicionadas, custoPorPacote, estoqueMinimo, ultimaEntrada]
-            );
+            await pool.query('INSERT INTO estoque (produto, fornecedor_id, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, ultimaentrada) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [produto, fornecedor_id || null, novosPacotes, unidadesAvulsas, totalUnidadesAdicionadas, custoPorPacote, estoqueMinimo, ultimaEntrada]);
         }
         res.status(201).json({ message: 'Estoque atualizado!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -147,6 +103,7 @@ app.put('/api/estoque/:id', async (req, res) => {
     const { id } = req.params;
     const { fornecedor_id, pacotes, unidadesavulsas, custoporpacote, estoqueminimo } = req.body;
     const itemInfo = await pool.query('SELECT produto FROM estoque WHERE id = $1', [id]);
+    if (itemInfo.rows.length === 0) { return res.status(404).json({ error: 'Item não encontrado para editar.' }); }
     const tipo = itemInfo.rows[0].produto.toLowerCase().includes('rolo') ? 'rolo' : 'cartela';
     const totalunidades = tipo === 'rolo' ? pacotes : (pacotes * 5000) + unidadesavulsas;
     const updateQuery = `UPDATE estoque SET fornecedor_id = $1, pacotes = $2, unidadesavulsas = $3, totalunidades = $4, custoporpacote = $5, estoqueminimo = $6 WHERE id = $7`;
@@ -215,16 +172,14 @@ app.delete('/api/fornecedores/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- NOVAS ROTAS DE RELATÓRIOS ---
 app.get('/api/relatorios/valor-por-produto', async (req, res) => {
-  console.log('>>> ROTA GET /api/relatorios/valor-por-produto ACESSADA');
   try {
     const query = `
       SELECT 
         produto, 
         totalunidades,
         CASE
-          WHEN produto LIKE '%Rolo%' THEN totalunidades * custoporpacote
+          WHEN produto ILIKE '%rolo%' THEN totalunidades * custoporpacote
           ELSE (totalunidades / 5000.0) * custoporpacote
         END AS valor_total
       FROM estoque
@@ -233,26 +188,18 @@ app.get('/api/relatorios/valor-por-produto', async (req, res) => {
     `;
     const result = await pool.query(query);
     res.json({ data: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/relatorios/saidas-por-periodo', async (req, res) => {
-    console.log('>>> ROTA GET /api/relatorios/saidas-por-periodo ACESSADA');
     const { de, ate } = req.query;
-    if (!de || !ate) {
-        return res.status(400).json({ error: 'As datas de início e fim são obrigatórias.' });
-    }
+    if (!de || !ate) { return res.status(400).json({ error: 'As datas de início e fim são obrigatórias.' }); }
     try {
         const query = 'SELECT * FROM saidas WHERE data >= $1 AND data <= $2 ORDER BY data DESC';
         const result = await pool.query(query, [de, ate]);
         res.json({ data: result.rows });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
