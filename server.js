@@ -1,19 +1,25 @@
-// server.js - VERSÃO CORRIGIDA (sem código de login)
+// server.js - VERSÃO 100% COMPLETA com IA Gemini
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // <-- NOVIDADE
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configuração da conexão com o PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
+// Inicialização da IA do Google
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); // <-- NOVIDADE
+
+// Função para criar as tabelas se não existirem
 const createTables = async () => {
   const queryText = `
     CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );
@@ -36,13 +42,39 @@ const createTables = async () => {
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
 
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const protegerRota = (req, res, next) => {
     next(); // Proteção desativada por enquanto
 };
+
+// --- ROTAS DE AUTENTICAÇÃO ---
+// (Estas rotas estão aqui, mas não estão sendo usadas ativamente)
+app.post('/api/usuarios/registrar', async (req, res) => {
+    try {
+        const { email, senha } = req.body;
+        if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
+        const hashedPassword = await bcrypt.hash(senha, 10);
+        const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
+        res.status(201).json(newUser.rows[0]);
+    } catch (err) { res.status(500).json({ error: 'Email já pode estar em uso ou outro erro ocorreu.' }); }
+});
+app.post('/api/usuarios/login', async (req, res) => {
+  try {
+    const { email, senha } = req.body;
+    const userRes = await pool.query("SELECT * FROM usuarios WHERE email = $1", [email]);
+    if (userRes.rows.length === 0) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
+    const user = userRes.rows[0];
+    const senhaValida = await bcrypt.compare(senha, user.senha);
+    if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    res.json({ accessToken: accessToken });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // --- ROTAS DA API ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
@@ -212,8 +244,6 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         res.json({ data: relatorioProcessado });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-// --- ROTAS DE PRODUÇÃO ---
 app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     const { estoque_id, data_inicio } = req.body;
     const client = await pool.connect();
@@ -255,10 +285,64 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
         const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
         res.status(200).json({ data: result.rows[0] });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// NOVA ROTA DA IA
+app.post('/api/ai/analise', protegerRota, async (req, res) => {
+    const { pergunta } = req.body;
+    if (!pergunta) {
+        return res.status(400).json({ error: 'Nenhuma pergunta foi fornecida.' });
+    }
+
+    try {
+        // 1. Coletar os dados relevantes do nosso próprio banco de dados
+        const estoqueRes = await pool.query('SELECT e.produto, e.totalunidades, f.nome AS fornecedor_nome FROM estoque e LEFT JOIN fornecedores f ON e.fornecedor_id = f.id');
+        const saidasRes = await pool.query('SELECT produtonome, totalunidades, data, destino FROM saidas ORDER BY data DESC LIMIT 100');
+        const producaoRes = await pool.query('SELECT produto_nome, data_inicio, data_fim, etiquetas_impressas FROM uso_producao WHERE status = \'Finalizado\' ORDER BY data_fim DESC LIMIT 100');
+
+        const estoqueAtual = estoqueRes.rows;
+        const ultimasSaidas = saidasRes.rows;
+        const historicoProducao = producaoRes.rows;
+
+        // 2. Montar o "Prompt" para a IA
+        const prompt = `
+            Você é um assistente de análise de dados de um sistema de controle de estoque.
+            Responda à pergunta do usuário de forma direta e concisa, baseando-se exclusivamente nos dados fornecidos abaixo.
+            Não invente informações. Se os dados não permitirem responder, diga "Não tenho informações suficientes para responder a essa pergunta.".
+            Hoje é ${new Date().toLocaleDateString('pt-BR')}.
+
+            PERGUNTA DO USUÁRIO: "${pergunta}"
+
+            DADOS DISPONÍVEIS:
+            
+            Estoque Atual (JSON):
+            ${JSON.stringify(estoqueAtual)}
+
+            Últimas 100 Saídas/Consumo (JSON):
+            ${JSON.stringify(ultimasSaidas)}
+
+            Últimos 100 Registros de Produção Finalizados (JSON):
+            ${JSON.stringify(historicoProducao)}
+
+            Sua Resposta:
+        `;
+
+        // 3. Chamar a IA
+        const model = genAI.getGenerativeModel("gemini-pro");
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        // 4. Enviar a resposta da IA para o front-end
+        res.json({ resposta: text });
+
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Erro na rota da IA:", err);
+        res.status(500).json({ error: 'Ocorreu um erro ao processar sua pergunta com a IA.' });
     }
 });
+
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
