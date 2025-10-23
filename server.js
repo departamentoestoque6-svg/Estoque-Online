@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA E CORRIGIDA (sem login)
+// server.js - VERSÃO 100% CORRIGIDA (SEM login, COM IA)
 
 require('dotenv').config();
 const express = require('express');
@@ -60,6 +60,7 @@ app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
     res.json(stats);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
   try {
     const query = 'SELECT produto, totalunidades, estoqueminimo FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
@@ -67,18 +68,21 @@ app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.get('/api/estoque', protegerRota, async (req, res) => {
   try {
     const result = await pool.query(`SELECT e.*, f.nome AS fornecedor_nome FROM estoque e LEFT JOIN fornecedores f ON e.fornecedor_id = f.id ORDER BY e.produto`);
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.get('/api/saidas', protegerRota, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM saidas ORDER BY data DESC');
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.post('/api/estoque', protegerRota, async (req, res) => {
     const { produto, fornecedor_id, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
     const tipo = produto.toLowerCase().includes('rolo') ? 'rolo' : 'cartela';
@@ -98,6 +102,7 @@ app.post('/api/estoque', protegerRota, async (req, res) => {
         res.status(201).json({ message: 'Estoque atualizado!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.put('/api/estoque/:id', protegerRota, async (req, res) => {
   try {
     const { id } = req.params;
@@ -112,6 +117,7 @@ app.put('/api/estoque/:id', protegerRota, async (req, res) => {
     res.status(200).json({ message: 'Item atualizado com sucesso!' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.delete('/api/estoque/:id', protegerRota, async (req, res) => {
   try {
     const { id } = req.params;
@@ -120,6 +126,7 @@ app.delete('/api/estoque/:id', protegerRota, async (req, res) => {
     res.status(200).json({ message: 'Item deletado com sucesso!' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.post('/api/saidas', protegerRota, async (req, res) => {
   const { data, produtoId, totalUnidades, destino } = req.body;
   const client = await pool.connect();
@@ -145,12 +152,14 @@ app.post('/api/saidas', protegerRota, async (req, res) => {
     client.release();
   }
 });
+
 app.get('/api/fornecedores', protegerRota, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM fornecedores ORDER BY nome');
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.post('/api/fornecedores', protegerRota, async (req, res) => {
   try {
     const { nome } = req.body;
@@ -159,6 +168,7 @@ app.post('/api/fornecedores', protegerRota, async (req, res) => {
     res.status(201).json({ data: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.delete('/api/fornecedores/:id', protegerRota, async (req, res) => {
     try {
         const { id } = req.params;
@@ -166,6 +176,7 @@ app.delete('/api/fornecedores/:id', protegerRota, async (req, res) => {
         res.status(200).json({ message: 'Fornecedor deletado com sucesso!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
   try {
     const query = `
@@ -180,6 +191,7 @@ app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.get('/api/relatorios/saidas-por-periodo', protegerRota, async (req, res) => {
     const { de, ate } = req.query;
     if (!de || !ate) { return res.status(400).json({ error: 'As datas de início e fim são obrigatórias.' }); }
@@ -189,6 +201,7 @@ app.get('/api/relatorios/saidas-por-periodo', protegerRota, async (req, res) => 
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
     try {
         const query = `
@@ -217,6 +230,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         res.json({ data: relatorioProcessado });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     const { estoque_id, data_inicio } = req.body;
     const client = await pool.connect();
@@ -242,6 +256,7 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
         client.release();
     }
 });
+
 app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
     try {
         const query = `SELECT up.id, up.data_inicio, e.produto AS produto_nome FROM uso_producao up JOIN estoque e ON up.estoque_id = e.id WHERE up.status = 'Em Uso' ORDER BY up.data_inicio ASC`;
@@ -249,6 +264,7 @@ app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     const { id } = req.params;
     const { data_fim, etiquetas_impressas } = req.body;
@@ -261,7 +277,6 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ROTA DA IA
 app.post('/api/ai/analise', protegerRota, async (req, res) => {
     const { pergunta } = req.body;
     if (!pergunta) { return res.status(400).json({ error: 'Nenhuma pergunta foi fornecida.' }); }
