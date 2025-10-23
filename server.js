@@ -1,13 +1,11 @@
-// server.js - VERSÃO 100% COMPLETA E CORRIGIDA DA IA
+// server.js - VERSÃO 100% CORRIGIDA (SEM login, COM IA)
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // <-- Biblioteca da IA
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,13 +46,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const protegerRota = (req, res, next) => {
-    // Para simplificar, vamos desativar a proteção por enquanto
-    next();
+    next(); // Proteção desativada
 };
-
-// --- ROTAS DE AUTENTICAÇÃO (Ignoradas por enquanto) ---
-app.post('/api/usuarios/registrar', async (req, res) => { /* ... */ });
-app.post('/api/usuarios/login', async (req, res) => { /* ... */ });
 
 // --- ROTAS DA API ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
