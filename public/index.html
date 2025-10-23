@@ -275,9 +275,11 @@
         let meuGrafico = null;
         let sortConfig = { key: 'produto', direction: 'ascending' };
 
+        // Funções de Notificação
         function pedirPermissaoDeNotificacao(){ if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') { Notification.requestPermission().then(p => { if (p === 'granted') console.log('Permissão para notificações concedida!'); }); } }
         async function verificarAlertas(){ try { const res = await fetch(`${API_URL}/alertas/estoque-baixo`); if (!res.ok) return; const result = await res.json(); const itens = result.data; if (itens && itens.length > 0) { const msg = itens.length > 1 ? `${itens[0].produto} e mais ${itens.length - 1} estão com estoque baixo.` : `${itens[0].produto} está com estoque baixo (${itens[0].totalunidades} restantes).`; if (Notification.permission === 'granted') { new Notification('⚠️ Alerta de Estoque Baixo!', { body: msg, icon: 'https://cdn-icons-png.flaticon.com/512/10099/10099719.png' }); } } } catch (e) { console.error('Erro ao verificar alertas:', e); } }
 
+        // Funções Principais
         async function carregarDados() {
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
@@ -308,9 +310,13 @@
             popularDropdownProducao();
             renderizarProducaoEmUso();
         }
+
+        // Funções do Dashboard
         function atualizarDashboard(stats){ document.getElementById('dashTotalEstoque').textContent = `${parseFloat(stats.totalItens || 0).toLocaleString()} un`; document.getElementById('dashValorEstoque').textContent = formatarMoeda(parseFloat(stats.valorTotal || 0)); document.getElementById('dashCriticos').textContent = stats.itensCriticos || 0; }
         function renderizarGrafico(dadosEstoque){ const ctx = document.getElementById('graficoEstoque').getContext('2d'); if (meuGrafico) { meuGrafico.destroy(); } const top5 = [...dadosEstoque].sort((a, b) => b.totalunidades - a.totalunidades).slice(0, 5); const labels = top5.map(item => item.produto); const data = top5.map(item => item.totalunidades); meuGrafico = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Quantidade em Estoque', data: data, backgroundColor: 'rgba(52, 152, 219, 0.7)', borderColor: 'rgba(41, 128, 185, 1)', borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, responsive: true } }); }
         function mostrarItensCriticos(){ document.getElementById('filtroStatus').value = 'critico'; trocarAba('estoque'); }
+        
+        // Funções do Formulário e Estoque
         function getStatusEstoque(item){ if (item.estoqueminimo > 0 && item.totalunidades <= item.estoqueminimo) { return 'critico'; } if (item.totalunidades < 5000 && item.totalunidades > 0 && !item.produto.toLowerCase().includes('rolo')) { return 'baixo'; } return 'ok'; }
         function ajustarCamposProduto(){ const select = document.getElementById('estoqueProduto'); const selOpt = select.options[select.selectedIndex]; const tipo = selOpt.dataset.tipo; const lblPacotes = document.getElementById('labelPacotes'); const lblCusto = document.getElementById('labelCusto'); const grpUnidades = document.getElementById('groupUnidadesAvulsas'); const inptUnidades = document.getElementById('estoqueUnidades'); if (tipo === 'rolo') { lblPacotes.innerHTML = 'Qtd. de Rolos <span style="color: red;">*</span>'; lblCusto.innerHTML = 'Custo por Rolo (R$) <span style="color: red;">*</span>'; grpUnidades.style.display = 'none'; inptUnidades.value = 0; } else { lblPacotes.innerHTML = 'Pacotes <span style="color: red;">*</span>'; lblCusto.innerHTML = 'Custo/Pacote (R$) <span style="color: red;">*</span>'; grpUnidades.style.display = 'flex'; } }
         async function adicionarEstoque(){ const sel = document.getElementById('estoqueProduto'); const item = { produto: sel.value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, pacotes: parseInt(document.getElementById('estoquePacotes').value) || 0, unidadesAvulsas: parseInt(document.getElementById('estoqueUnidades').value) || 0, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || (!item.pacotes && !item.unidadesAvulsas) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
@@ -329,44 +335,9 @@
         function finalizarProducao(id){ const item = emUso.find(i => i.id === id); if (!item) return; document.getElementById('finalizarId').value = item.id; document.getElementById('finalizarProduto').value = item.produto_nome; document.getElementById('finalizarDataFim').value = new Date().toISOString().split('T')[0]; const grpEtiquetas = document.getElementById('groupEtiquetasImpressas'); if (item.produto_nome.toLowerCase().includes('etiqueta')) { grpEtiquetas.style.display = 'block'; } else { grpEtiquetas.style.display = 'none'; } document.getElementById('modalFinalizarProducao').style.display = 'block'; }
         async function salvarFinalizacao(){ const id = document.getElementById('finalizarId').value; const data = { data_fim: document.getElementById('finalizarDataFim').value, etiquetas_impressas: parseInt(document.getElementById('finalizarEtiquetas').value) || null }; if (!data.data_fim) return mostrarMensagem('A data de finalização é obrigatória.', 'error'); try { const res = await fetch(`/api/producao/finalizar/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!res.ok) throw new Error('Falha ao finalizar uso.'); mostrarMensagem('Uso de rolo finalizado!', 'success'); fecharModalProducao(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
-        // Funções da IA
-        function adicionarMensagemChat(texto, tipo) {
-            const chatLog = document.getElementById('chatLog');
-            const msgDiv = document.createElement('div');
-            msgDiv.classList.add('chat-message', tipo);
-            msgDiv.textContent = texto;
-            chatLog.appendChild(msgDiv);
-            chatLog.scrollTop = chatLog.scrollHeight;
-        }
-        async function enviarPerguntaIA() {
-            const input = document.getElementById('perguntaIA');
-            const pergunta = input.value.trim();
-            if (!pergunta) return;
-
-            adicionarMensagemChat(pergunta, 'user');
-            input.value = '';
-            const pensandoDiv = document.createElement('div');
-            pensandoDiv.classList.add('chat-message', 'ia', 'pensando');
-            pensandoDiv.textContent = 'Analisando dados e pensando...';
-            document.getElementById('chatLog').appendChild(pensandoDiv);
-
-            try {
-                const response = await fetch(`${API_URL}/ai/analise`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pergunta: pergunta }) });
-                const result = await response.json();
-                if (!response.ok) { throw new Error(result.error || 'Erro na API'); }
-                adicionarMensagemChat(result.resposta, 'ia');
-            } catch (error) {
-                adicionarMensagemChat(`Desculpe, ocorreu um erro: ${error.message}`, 'ia');
-            } finally {
-                if (pensandoDiv && pensandoDiv.parentNode === document.getElementById('chatLog')) {
-                    document.getElementById('chatLog').removeChild(pensandoDiv);
-                }
-            }
-        }
-        
-        // Funções de UI e Auxiliares
         function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } }
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
+        
         function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
         function renderizarFornecedores(){ const tbody = document.getElementById('tabelaFornecedores'); tbody.innerHTML = ''; fornecedores.forEach(f => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }

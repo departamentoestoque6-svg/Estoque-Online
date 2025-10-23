@@ -5,12 +5,11 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // A única nova dependência
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuração da conexão com o PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -19,13 +18,11 @@ const pool = new Pool({
 // Inicialização da IA do Google
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Função para criar as tabelas se não existirem
 const createTables = async () => {
   const queryText = `
     CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );
     CREATE TABLE IF NOT EXISTS estoque ( id SERIAL PRIMARY KEY, produto TEXT NOT NULL, fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL, pacotes INTEGER DEFAULT 0, unidadesAvulsas INTEGER DEFAULT 0, totalUnidades INTEGER DEFAULT 0, custoPorPacote REAL DEFAULT 0, estoqueMinimo INTEGER DEFAULT 0, ultimaEntrada DATE );
     CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
-    CREATE TABLE IF NOT EXISTS usuarios ( id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, senha TEXT NOT NULL );
     CREATE TABLE IF NOT EXISTS uso_producao (
       id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
@@ -42,7 +39,6 @@ const createTables = async () => {
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -264,51 +260,38 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NOVA ROTA DA IA (CORRIGIDA)
 app.post('/api/ai/analise', protegerRota, async (req, res) => {
     const { pergunta } = req.body;
-    if (!pergunta) {
-        return res.status(400).json({ error: 'Nenhuma pergunta foi fornecida.' });
-    }
-
+    if (!pergunta) { return res.status(400).json({ error: 'Nenhuma pergunta foi fornecida.' }); }
     try {
         const estoqueRes = await pool.query('SELECT e.produto, e.totalunidades, f.nome AS fornecedor_nome FROM estoque e LEFT JOIN fornecedores f ON e.fornecedor_id = f.id');
         const saidasRes = await pool.query('SELECT produtonome, totalunidades, data, destino FROM saidas ORDER BY data DESC LIMIT 100');
         const producaoRes = await pool.query('SELECT produto_nome, data_inicio, data_fim, etiquetas_impressas FROM uso_producao WHERE status = \'Finalizado\' ORDER BY data_fim DESC LIMIT 100');
-
         const estoqueAtual = estoqueRes.rows;
         const ultimasSaidas = saidasRes.rows;
         const historicoProducao = producaoRes.rows;
-
         const prompt = `
             Você é um assistente de análise de dados de um sistema de controle de estoque.
             Responda à pergunta do usuário de forma direta e concisa, baseando-se exclusivamente nos dados fornecidos abaixo.
             Não invente informações. Se os dados não permitirem responder, diga "Não tenho informações suficientes para responder a essa pergunta.".
             Hoje é ${new Date().toLocaleDateString('pt-BR')}.
-
             PERGUNTA DO USUÁRIO: "${pergunta}"
-
             DADOS DISPONÍVEIS:
             Estoque Atual (JSON): ${JSON.stringify(estoqueAtual)}
             Últimas 100 Saídas/Consumo (JSON): ${JSON.stringify(ultimasSaidas)}
             Últimos 100 Registros de Produção Finalizados (JSON): ${JSON.stringify(historicoProducao)}
-
             Sua Resposta:
         `;
-
         const model = genAI.getGenerativeModel("gemini-pro");
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
-
         res.json({ resposta: text });
-
     } catch (err) {
         console.error("Erro na rota da IA:", err);
         res.status(500).json({ error: 'Ocorreu um erro ao processar sua pergunta com a IA.' });
     }
 });
-
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
