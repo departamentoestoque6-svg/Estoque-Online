@@ -54,7 +54,6 @@
         .badge-success { background: #d4edda; color: #155724; }
         .badge-warning { background: #fff3cd; color: #856404; }
         .badge-danger { background: #f8d7da; color: #721c24; }
-        /* --- ESTILOS DO CHAT DA IA --- */
         .chat-container { display: flex; flex-direction: column; height: 60vh; border: 2px solid #e9ecef; border-radius: 10px; overflow: hidden; }
         .chat-log { flex-grow: 1; padding: 20px; overflow-y: auto; background-color: #f8f9fa; }
         .chat-message { margin-bottom: 15px; padding: 10px 15px; border-radius: 20px; max-width: 80%; line-height: 1.5; }
@@ -125,7 +124,6 @@
                     </table>
                 </div>
             </div>
-            
             <div id="aba-saida" class="tab-content">
                  <div class="section">
                     <h3>Registrar Consumo Geral</h3>
@@ -146,7 +144,6 @@
                     </table>
                 </div>
             </div>
-
             <div id="aba-fornecedores" class="tab-content">
                 <div class="section">
                     <h3>Novo Fornecedor</h3>
@@ -168,7 +165,6 @@
                     </table>
                 </div>
             </div>
-
              <div id="aba-producao" class="tab-content">
                 <div class="section">
                     <h3>Iniciar Uso de Rolo em Produção</h3>
@@ -186,7 +182,6 @@
                     </table>
                 </div>
             </div>
-
             <div id="aba-relatorios" class="tab-content">
                 <div class="section">
                     <h3>Relatório de Saídas por Período</h3>
@@ -221,7 +216,6 @@
                     </div>
                 </div>
             </div>
-
             <div id="aba-ia" class="tab-content">
                 <div class="section">
                     <h3>Assistente de Análise (IA)</h3>
@@ -239,7 +233,6 @@
             </div>
         </div>
     </div>
-
     <div id="modalEdicao" class="modal">
         <div class="modal-content">
             <span class="close" onclick="fecharModal()">&times;</span>
@@ -260,7 +253,6 @@
             <button class="btn btn-success" onclick="salvarEdicao()">Salvar Alterações</button>
         </div>
     </div>
-    
     <div id="modalFinalizarProducao" class="modal">
         <div class="modal-content">
             <span class="close" onclick="fecharModalProducao()">&times;</span>
@@ -276,7 +268,6 @@
             <button class="btn btn-success" onclick="salvarFinalizacao()">Finalizar Uso</button>
         </div>
     </div>
-
     <script>
         const API_URL = '/api';
         const UN_POR_PACOTE = 5000;
@@ -374,22 +365,20 @@
             document.getElementById('chatLog').appendChild(pensandoDiv);
 
             try {
-                const response = await fetch(`${API_URL}/ai/analise`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pergunta: pergunta })
-                });
+                const response = await fetch(`${API_URL}/ai/analise`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pergunta: pergunta }) });
                 const result = await response.json();
-                document.getElementById('chatLog').removeChild(pensandoDiv); // Remove a mensagem "pensando"
                 if (!response.ok) { throw new Error(result.error || 'Erro na API'); }
                 adicionarMensagemChat(result.resposta, 'ia');
             } catch (error) {
-                document.getElementById('chatLog').removeChild(pensandoDiv); // Remove a mensagem "pensando"
                 adicionarMensagemChat(`Desculpe, ocorreu um erro: ${error.message}`, 'ia');
+            } finally {
+                if (pensandoDiv.parentNode) {
+                    pensandoDiv.parentNode.removeChild(pensandoDiv);
+                }
             }
         }
         
-        // Funções de UI e Auxiliares
+        // Funções de Renderização e UI
         function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } }
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
         function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }

@@ -1,11 +1,11 @@
-// server.js - VERSÃO 100% COMPLETA com IA Gemini
+// server.js - VERSÃO 100% COMPLETA E CORRIGIDA (sem login)
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // <-- NOVIDADE
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // A única nova dependência
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,7 +17,7 @@ const pool = new Pool({
 });
 
 // Inicialização da IA do Google
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); // <-- NOVIDADE
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Função para criar as tabelas se não existirem
 const createTables = async () => {
@@ -49,32 +49,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const protegerRota = (req, res, next) => {
-    next(); // Proteção desativada por enquanto
+    next(); // Proteção desativada
 };
-
-// --- ROTAS DE AUTENTICAÇÃO ---
-// (Estas rotas estão aqui, mas não estão sendo usadas ativamente)
-app.post('/api/usuarios/registrar', async (req, res) => {
-    try {
-        const { email, senha } = req.body;
-        if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
-        const hashedPassword = await bcrypt.hash(senha, 10);
-        const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
-        res.status(201).json(newUser.rows[0]);
-    } catch (err) { res.status(500).json({ error: 'Email já pode estar em uso ou outro erro ocorreu.' }); }
-});
-app.post('/api/usuarios/login', async (req, res) => {
-  try {
-    const { email, senha } = req.body;
-    const userRes = await pool.query("SELECT * FROM usuarios WHERE email = $1", [email]);
-    if (userRes.rows.length === 0) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-    const user = userRes.rows[0];
-    const senhaValida = await bcrypt.compare(senha, user.senha);
-    if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ accessToken: accessToken });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
 
 // --- ROTAS DA API ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
@@ -288,7 +264,7 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NOVA ROTA DA IA
+// NOVA ROTA DA IA (CORRIGIDA)
 app.post('/api/ai/analise', protegerRota, async (req, res) => {
     const { pergunta } = req.body;
     if (!pergunta) {
@@ -296,7 +272,6 @@ app.post('/api/ai/analise', protegerRota, async (req, res) => {
     }
 
     try {
-        // 1. Coletar os dados relevantes do nosso próprio banco de dados
         const estoqueRes = await pool.query('SELECT e.produto, e.totalunidades, f.nome AS fornecedor_nome FROM estoque e LEFT JOIN fornecedores f ON e.fornecedor_id = f.id');
         const saidasRes = await pool.query('SELECT produtonome, totalunidades, data, destino FROM saidas ORDER BY data DESC LIMIT 100');
         const producaoRes = await pool.query('SELECT produto_nome, data_inicio, data_fim, etiquetas_impressas FROM uso_producao WHERE status = \'Finalizado\' ORDER BY data_fim DESC LIMIT 100');
@@ -305,7 +280,6 @@ app.post('/api/ai/analise', protegerRota, async (req, res) => {
         const ultimasSaidas = saidasRes.rows;
         const historicoProducao = producaoRes.rows;
 
-        // 2. Montar o "Prompt" para a IA
         const prompt = `
             Você é um assistente de análise de dados de um sistema de controle de estoque.
             Responda à pergunta do usuário de forma direta e concisa, baseando-se exclusivamente nos dados fornecidos abaixo.
@@ -315,26 +289,18 @@ app.post('/api/ai/analise', protegerRota, async (req, res) => {
             PERGUNTA DO USUÁRIO: "${pergunta}"
 
             DADOS DISPONÍVEIS:
-            
-            Estoque Atual (JSON):
-            ${JSON.stringify(estoqueAtual)}
-
-            Últimas 100 Saídas/Consumo (JSON):
-            ${JSON.stringify(ultimasSaidas)}
-
-            Últimos 100 Registros de Produção Finalizados (JSON):
-            ${JSON.stringify(historicoProducao)}
+            Estoque Atual (JSON): ${JSON.stringify(estoqueAtual)}
+            Últimas 100 Saídas/Consumo (JSON): ${JSON.stringify(ultimasSaidas)}
+            Últimos 100 Registros de Produção Finalizados (JSON): ${JSON.stringify(historicoProducao)}
 
             Sua Resposta:
         `;
 
-        // 3. Chamar a IA
         const model = genAI.getGenerativeModel("gemini-pro");
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
 
-        // 4. Enviar a resposta da IA para o front-end
         res.json({ resposta: text });
 
     } catch (err) {
