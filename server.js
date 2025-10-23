@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% CORRIGIDA (SEM login, COM IA)
+// server.js - VERSÃO 100% COMPLETA E CORRIGIDA (com IA e sem login)
 
 require('dotenv').config();
 const express = require('express');
@@ -285,7 +285,7 @@ app.post('/api/ai/analise', protegerRota, async (req, res) => {
             Sua Resposta:
         `;
         
-        // CORREÇÃO: Adicionamos o nome do modelo
+        // ***** A CORREÇÃO ESTÁ AQUI *****
         const model = genAI.getGenerativeModel("gemini-pro");
         
         const result = await model.generateContent(prompt);
@@ -297,7 +297,6 @@ app.post('/api/ai/analise', protegerRota, async (req, res) => {
         res.status(500).json({ error: 'Ocorreu um erro ao processar sua pergunta com a IA.' });
     }
 });
-
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
