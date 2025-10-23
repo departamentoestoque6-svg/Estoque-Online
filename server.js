@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // A única nova dependência
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,6 +23,7 @@ const createTables = async () => {
     CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );
     CREATE TABLE IF NOT EXISTS estoque ( id SERIAL PRIMARY KEY, produto TEXT NOT NULL, fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL, pacotes INTEGER DEFAULT 0, unidadesAvulsas INTEGER DEFAULT 0, totalUnidades INTEGER DEFAULT 0, custoPorPacote REAL DEFAULT 0, estoqueMinimo INTEGER DEFAULT 0, ultimaEntrada DATE );
     CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
+    CREATE TABLE IF NOT EXISTS usuarios ( id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, senha TEXT NOT NULL );
     CREATE TABLE IF NOT EXISTS uso_producao (
       id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
@@ -260,6 +261,7 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ROTA DA IA
 app.post('/api/ai/analise', protegerRota, async (req, res) => {
     const { pergunta } = req.body;
     if (!pergunta) { return res.status(400).json({ error: 'Nenhuma pergunta foi fornecida.' }); }
