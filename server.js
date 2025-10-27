@@ -1,11 +1,10 @@
-// server.js - VERSÃO 100% COMPLETA E CORRIGIDA (com IA e sem login)
+// server.js - VERSÃO 100% COMPLETA e ESTÁVEL (Sem IA)
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,9 +13,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
-
-// Inicialização da IA do Google
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const createTables = async () => {
   const queryText = `
@@ -259,43 +255,6 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
         res.status(200).json({ data: result.rows[0] });
     } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ROTA DA IA (CORRIGIDA)
-app.post('/api/ai/analise', protegerRota, async (req, res) => {
-    const { pergunta } = req.body;
-    if (!pergunta) { return res.status(400).json({ error: 'Nenhuma pergunta foi fornecida.' }); }
-    try {
-        const estoqueRes = await pool.query('SELECT e.produto, e.totalunidades, f.nome AS fornecedor_nome FROM estoque e LEFT JOIN fornecedores f ON e.fornecedor_id = f.id');
-        const saidasRes = await pool.query('SELECT produtonome, totalunidades, data, destino FROM saidas ORDER BY data DESC LIMIT 100');
-        const producaoRes = await pool.query('SELECT produto_nome, data_inicio, data_fim, etiquetas_impressas FROM uso_producao WHERE status = \'Finalizado\' ORDER BY data_fim DESC LIMIT 100');
-        const estoqueAtual = estoqueRes.rows;
-        const ultimasSaidas = saidasRes.rows;
-        const historicoProducao = producaoRes.rows;
-        const prompt = `
-            Você é um assistente de análise de dados de um sistema de controle de estoque.
-            Responda à pergunta do usuário de forma direta e concisa, baseando-se exclusivamente nos dados fornecidos abaixo.
-            Não invente informações. Se os dados não permitirem responder, diga "Não tenho informações suficientes para responder a essa pergunta.".
-            Hoje é ${new Date().toLocaleDateString('pt-BR')}.
-            PERGUNTA DO USUÁRIO: "${pergunta}"
-            DADOS DISPONÍVEIS:
-            Estoque Atual (JSON): ${JSON.stringify(estoqueAtual)}
-            Últimas 100 Saídas/Consumo (JSON): ${JSON.stringify(ultimasSaidas)}
-            Últimos 100 Registros de Produção Finalizados (JSON): ${JSON.stringify(historicoProducao)}
-            Sua Resposta:
-        `;
-        
-        // ***** A CORREÇÃO ESTÁ AQUI *****
-        const model = genAI.getGenerativeModel("gemini-pro");
-        
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        res.json({ resposta: text });
-    } catch (err) {
-        console.error("Erro na rota da IA:", err);
-        res.status(500).json({ error: 'Ocorreu um erro ao processar sua pergunta com a IA.' });
-    }
 });
 
 

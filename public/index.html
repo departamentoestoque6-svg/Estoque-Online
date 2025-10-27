@@ -54,16 +54,6 @@
         .badge-success { background: #d4edda; color: #155724; }
         .badge-warning { background: #fff3cd; color: #856404; }
         .badge-danger { background: #f8d7da; color: #721c24; }
-        .chat-container { display: flex; flex-direction: column; height: 60vh; border: 2px solid #e9ecef; border-radius: 10px; overflow: hidden; }
-        .chat-log { flex-grow: 1; padding: 20px; overflow-y: auto; background-color: #f8f9fa; }
-        .chat-message { margin-bottom: 15px; padding: 10px 15px; border-radius: 20px; max-width: 80%; line-height: 1.5; }
-        .chat-message.user { background-color: #3498db; color: white; border-bottom-left-radius: 5px; margin-left: auto; }
-        .chat-message.ia { background-color: #ecf0f1; color: #2c3e50; border-bottom-right-radius: 5px; margin-right: auto; }
-        .chat-message.ia.pensando { color: #888; font-style: italic; }
-        .chat-input-area { display: flex; border-top: 2px solid #e9ecef; padding: 10px; }
-        .chat-input { flex-grow: 1; padding: 12px; border: 2px solid #e9ecef; border-radius: 20px; font-size: 16px; outline: none; }
-        .chat-input:focus { border-color: #3498db; }
-        .chat-send-btn { margin-left: 10px; padding: 0 25px; border: none; background: #3498db; color: white; border-radius: 20px; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -77,7 +67,6 @@
                 <button class="tab" onclick="trocarAba('fornecedores')">Fornecedores</button>
                 <button class="tab" onclick="trocarAba('producao')">Produção</button>
                 <button class="tab" onclick="trocarAba('relatorios')">Relatórios</button>
-                <button class="tab" onclick="trocarAba('ia')">Assistente IA</button>
             </div>
             <div class="success-message" id="successMessage"></div>
             <div class="error-message" id="errorMessage"></div>
@@ -216,22 +205,7 @@
                     </div>
                 </div>
             </div>
-            <div id="aba-ia" class="tab-content">
-                <div class="section">
-                    <h3>Assistente de Análise (IA)</h3>
-                    <p>Faça uma pergunta sobre seu estoque, saídas ou produção para a IA analisar.</p>
-                </div>
-                <div class="chat-container">
-                    <div class="chat-log" id="chatLog">
-                        <div class="chat-message ia">Olá! Eu sou seu assistente de estoque. Pergunte-me algo como: "Qual produto tem a maior quantidade em estoque?" ou "Quantas saídas tivemos hoje?".</div>
-                    </div>
-                    <div class="chat-input-area">
-                        <input type="text" id="perguntaIA" class="chat-input" placeholder="Digite sua pergunta...">
-                        <button class="chat-send-btn" onclick="enviarPerguntaIA()">Perguntar</button>
-                    </div>
-                </div>
             </div>
-        </div>
     </div>
     <div id="modalEdicao" class="modal">
         <div class="modal-content">
@@ -335,7 +309,7 @@
         async function gerarRelatorioSaidas(){ const de = document.getElementById('relatorioDe').value; const ate = document.getElementById('relatorioAte').value; if (!de || !ate) { return mostrarMensagem('Selecione as duas datas.', 'error'); } try { const res = await fetch(`${API_URL}/relatorios/saidas-por-periodo?de=${de}&ate=${ate}`); if (!res.ok) throw new Error('Falha ao gerar relatório.'); const result = await res.json(); renderizarRelatorioSaidas(result.data); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function carregarRelatorios(){ try { const resValor = await fetch(`${API_URL}/relatorios/valor-por-produto`); if (!resValor.ok) throw new Error('Falha ao carregar relatório de valor.'); const resultValor = await resValor.json(); renderizarRelatorioValor(resultValor.data); const resHistorico = await fetch(`${API_URL}/relatorios/historico-uso`); if (!resHistorico.ok) throw new Error('Falha ao carregar histórico de uso.'); const resultHistorico = await resHistorico.json(); renderizarHistoricoUso(resultHistorico.data); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         function renderizarRelatorioSaidas(dados){ const tbody = document.querySelector('#tabelaRelatorioSaidas tbody'); tbody.innerHTML = ''; dados.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
-        function renderizarRelatorioValor(dados){ const tbody = document.querySelector('#tabelaRelatorioValorTbody'); tbody.innerHTML = ''; dados.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto}</td><td class="number">${(i.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(parseFloat(i.valor_total))}</td>`; tbody.appendChild(tr); }); }
+        function renderizarRelatorioValor(dados){ const tbody = document.querySelector('#tabelaRelatorioValor tbody'); tbody.innerHTML = ''; dados.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto}</td><td class="number">${(i.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(parseFloat(i.valor_total))}</td>`; tbody.appendChild(tr); }); }
         function renderizarHistoricoUso(dados){ const tbody = document.getElementById('tabelaHistoricoUso'); tbody.innerHTML = ''; dados.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto_nome}</td><td>${formatarData(i.data_inicio)}</td><td>${formatarData(i.data_fim)}</td><td class="number">${i.dias_uteis}</td><td class="currency">${formatarMoeda(i.custo_dia)}</td><td class="number">${i.media_etiquetas_dia ? i.media_etiquetas_dia.toFixed(2) : 'N/A'}</td>`; tbody.appendChild(tr); }); }
         
         // Funções de Produção
@@ -343,7 +317,7 @@
         function finalizarProducao(id){ const item = emUso.find(i => i.id === id); if (!item) return; document.getElementById('finalizarId').value = item.id; document.getElementById('finalizarProduto').value = item.produto_nome; document.getElementById('finalizarDataFim').value = new Date().toISOString().split('T')[0]; const grpEtiquetas = document.getElementById('groupEtiquetasImpressas'); if (item.produto_nome.toLowerCase().includes('etiqueta')) { grpEtiquetas.style.display = 'block'; } else { grpEtiquetas.style.display = 'none'; } document.getElementById('modalFinalizarProducao').style.display = 'block'; }
         async function salvarFinalizacao(){ const id = document.getElementById('finalizarId').value; const data = { data_fim: document.getElementById('finalizarDataFim').value, etiquetas_impressas: parseInt(document.getElementById('finalizarEtiquetas').value) || null }; if (!data.data_fim) return mostrarMensagem('A data de finalização é obrigatória.', 'error'); try { const res = await fetch(`/api/producao/finalizar/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!res.ok) throw new Error('Falha ao finalizar uso.'); mostrarMensagem('Uso de rolo finalizado!', 'success'); fecharModalProducao(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
-        // Funções da IA
+        // Funções da IA (CORRIGIDAS)
         function adicionarMensagemChat(texto, tipo) {
             const chatLog = document.getElementById('chatLog');
             const msgDiv = document.createElement('div');
@@ -379,7 +353,7 @@
         }
         
         // Funções de UI e Auxiliares
-        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } }
+        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else if (aba !== 'ia') { atualizarTodaUI(); } }
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
         function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
