@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA com Preferências de Alerta
+// server.js - VERSÃO 100% COMPLETA (com NodeMailer/Gmail)
 
 require('dotenv').config();
 const express = require('express');
@@ -7,25 +7,38 @@ const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer'); // <-- NOVO
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// --- CONFIGURAÇÕES ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
+// Configura o NodeMailer com o Gmail
+const emailRemetente = process.env.EMAIL_REMETENTE;
+const emailSenha = process.env.EMAIL_SENHA;
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: emailRemetente,
+        pass: emailSenha
+    }
+});
+
+// --- CRIAÇÃO DE TABELAS ---
 const createTables = async () => {
   const queryText = `
     CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );
-    
     CREATE TABLE IF NOT EXISTS categorias (
       id SERIAL PRIMARY KEY,
       nome TEXT NOT NULL UNIQUE,
       tipo_unidade VARCHAR(50) NOT NULL DEFAULT 'cartela'
     );
-
     CREATE TABLE IF NOT EXISTS estoque (
       id SERIAL PRIMARY KEY,
       produto TEXT NOT NULL,
@@ -39,16 +52,13 @@ const createTables = async () => {
       ultimaEntrada DATE,
       UNIQUE(produto, fornecedor_id)
     );
-
     CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
-    
     CREATE TABLE IF NOT EXISTS usuarios (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       senha TEXT NOT NULL,
       receber_alertas BOOLEAN DEFAULT false
     );
-    
     CREATE TABLE IF NOT EXISTS uso_producao (
       id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
@@ -69,8 +79,6 @@ const createTables = async () => {
             await pool.query(queryText); 
         }
     }
-    
-    // Adiciona a nova coluna 'receber_alertas' se ela não existir
     try {
         await pool.query('SELECT receber_alertas FROM usuarios LIMIT 1');
     } catch (e) {
@@ -79,17 +87,16 @@ const createTables = async () => {
             await pool.query('ALTER TABLE usuarios ADD COLUMN receber_alertas BOOLEAN DEFAULT false');
         }
     }
-
     await pool.query(queryText); 
     console.log('Tabelas verificadas/criadas com sucesso.');
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
 
+// --- MIDDLEWARES ---
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const protegerRota = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -113,12 +120,10 @@ app.post('/api/usuarios/registrar', async (req, res) => {
     try {
         const { email, senha } = req.body;
         if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
-        
         const userCountRes = await pool.query("SELECT COUNT(*) FROM usuarios");
         if (userCountRes.rows[0].count > 0) {
             return res.status(403).json({ error: 'Novos registros estão desativados.' });
         }
-
         const hashedPassword = await bcrypt.hash(senha, 10);
         const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
         res.status(201).json(newUser.rows[0]);
@@ -133,7 +138,6 @@ app.post('/api/usuarios/login', async (req, res) => {
     const user = userRes.rows[0];
     const senhaValida = await bcrypt.compare(senha, user.senha);
     if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-
     const jwtSecret = process.env.JWT_SECRET || 'seu-segredo-super-secreto-aqui-12345';
     const accessToken = jwt.sign({ id: user.id, email: user.email }, jwtSecret, { expiresIn: '1d' });
     res.json({ accessToken: accessToken });
@@ -148,7 +152,7 @@ app.get('/app', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// --- ROTA PROTEGIDA (Alteração de Senha) ---
+// --- ROTAS PROTEGIDAS DE USUÁRIO ---
 app.put('/api/usuarios/alterar-senha', protegerRota, async (req, res) => {
     const { senhaAtual, novaSenha } = req.body;
     const userId = req.user.id; 
@@ -167,8 +171,6 @@ app.put('/api/usuarios/alterar-senha', protegerRota, async (req, res) => {
         res.status(500).json({ error: 'Erro interno ao alterar a senha.' });
     }
 });
-
-// --- NOVAS ROTAS DE PREFERÊNCIAS ---
 app.get('/api/usuarios/preferencias', protegerRota, async (req, res) => {
     const userId = req.user.id;
     try {
@@ -179,7 +181,6 @@ app.get('/api/usuarios/preferencias', protegerRota, async (req, res) => {
         res.status(500).json({ error: 'Erro ao buscar preferências.' });
     }
 });
-
 app.put('/api/usuarios/preferencias', protegerRota, async (req, res) => {
     const userId = req.user.id;
     const { receber_alertas } = req.body;
@@ -188,6 +189,52 @@ app.put('/api/usuarios/preferencias', protegerRota, async (req, res) => {
         res.status(200).json({ message: 'Preferências atualizadas com sucesso!' });
     } catch (err) {
         res.status(500).json({ error: 'Erro ao salvar preferências.' });
+    }
+});
+
+// --- FUNÇÃO E ROTA DE TESTE DE EMAIL ---
+async function enviarEmailAlerta(para, assunto, textoHtml) {
+    if (!emailRemetente || !emailSenha) {
+        console.error("ERRO: EMAIL_REMETENTE ou EMAIL_SENHA não definidos. Email não pode ser enviado.");
+        return;
+    }
+    const msg = {
+        from: `"Sistema de Estoque" <${emailRemetente}>`,
+        to: para,
+        subject: assunto,
+        html: textoHtml,
+    };
+    try {
+        await transporter.sendMail(msg);
+        console.log(`Email enviado com sucesso para ${para}`);
+    } catch (error) {
+        console.error('Erro ao enviar email pelo NodeMailer/Gmail:', error);
+    }
+}
+
+app.post('/api/estoque/verificar-alertas', protegerRota, async (req, res) => {
+    try {
+        const itensRes = await pool.query('SELECT produto, totalunidades FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0');
+        const itensCriticos = itensRes.rows;
+        if (itensCriticos.length === 0) {
+            return res.status(200).json({ message: 'Nenhum item crítico encontrado. Emails não enviados.' });
+        }
+        let listaHtml = '<ul>';
+        itensCriticos.forEach(item => {
+            listaHtml += `<li><b>${item.produto}:</b> ${item.totalunidades} unidades restantes.</li>`;
+        });
+        listaHtml += '</ul>';
+        const corpoHtml = `<h2>Alerta de Estoque Crítico</h2><p>Os seguintes itens do seu estoque estão acabando:</p>${listaHtml}<p>Por favor, acesse o sistema para tomar uma providência.</p>`;
+        const usuariosRes = await pool.query('SELECT email FROM usuarios WHERE receber_alertas = true');
+        const destinatarios = usuariosRes.rows.map(u => u.email);
+        if (destinatarios.length === 0) {
+            return res.status(200).json({ message: 'Itens críticos encontrados, mas nenhum usuário optou por receber alertas.' });
+        }
+        await enviarEmailAlerta(destinatarios.join(', '), 'Alerta de Estoque Crítico', corpoHtml);
+        res.status(200).json({ message: `Alertas de estoque crítico enviados para ${destinatarios.length} usuário(s).` });
+    } catch (err) {
+        console.error("Erro na verificação de alertas:", err);
+        res.status(500).json({ error: 'Erro ao verificar alertas.' });
     }
 });
 
@@ -222,7 +269,7 @@ app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
 app.get('/api/estoque', protegerRota, async (req, res) => {
   try {
     const pagina = parseInt(req.query.pagina || 1);
-    const limite = 20; // 20 itens por página
+    const limite = 20;
     const offset = (pagina - 1) * limite;
     const dadosQuery = `
       SELECT e.*, f.nome AS fornecedor_nome, c.nome AS categoria_nome, c.tipo_unidade
