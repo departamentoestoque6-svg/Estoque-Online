@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA com Gestão de Categorias
+// server.js - VERSÃO 100% COMPLETA com Paginação
 
 require('dotenv').config();
 const express = require('express');
@@ -39,7 +39,9 @@ const createTables = async () => {
     );
 
     CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
+    
     CREATE TABLE IF NOT EXISTS usuarios ( id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, senha TEXT NOT NULL );
+    
     CREATE TABLE IF NOT EXISTS uso_producao (
       id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
@@ -51,17 +53,16 @@ const createTables = async () => {
     );
   `;
   try {
-    // Lógica para lidar com a migração da tabela de estoque
     try {
         await pool.query('SELECT categoria_id FROM estoque LIMIT 1');
     } catch (e) {
-        if (e.code === '42703') { // Coluna não existe
+        if (e.code === '42703') { 
             console.log('Detectada estrutura antiga. Limpando e recriando tabelas...');
-            await pool.query('DROP TABLE IF EXISTS saidas; DROP TABLE IF EXISTS uso_producao; DROP TABLE IF EXISTS estoque;');
-            await pool.query(queryText); // Recria tudo
+            await pool.query('DROP TABLE IF EXISTS saidas; DROP TABLE IF EXISTS uso_producao; DROP TABLE IF EXISTS estoque; DROP TABLE IF EXISTS categorias; DROP TABLE IF EXISTS fornecedores;');
+            await pool.query(queryText); 
         }
     }
-    await pool.query(queryText); // Garante que tudo seja criado
+    await pool.query(queryText); 
     console.log('Tabelas verificadas/criadas com sucesso.');
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
@@ -104,38 +105,73 @@ app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ROTA DE ESTOQUE ATUALIZADA COM PAGINAÇÃO
 app.get('/api/estoque', protegerRota, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const pagina = parseInt(req.query.pagina || 1);
+    const limite = 20; // 20 itens por página
+    const offset = (pagina - 1) * limite;
+
+    // 1. Consulta para pegar os dados da página
+    const dadosQuery = `
       SELECT e.*, f.nome AS fornecedor_nome, c.nome AS categoria_nome, c.tipo_unidade
       FROM estoque e 
       LEFT JOIN fornecedores f ON e.fornecedor_id = f.id
       LEFT JOIN categorias c ON e.categoria_id = c.id
       ORDER BY e.produto
-    `);
-    res.json({ data: result.rows });
+      LIMIT $1 OFFSET $2
+    `;
+    const dadosRes = await pool.query(dadosQuery, [limite, offset]);
+
+    // 2. Consulta para contar o total de itens
+    const totalQuery = 'SELECT COUNT(*) AS total_itens FROM estoque';
+    const totalRes = await pool.query(totalQuery);
+    const totalItens = parseInt(totalRes.rows[0].total_itens);
+    const totalPaginas = Math.ceil(totalItens / limite);
+
+    res.json({ 
+        data: dadosRes.rows,
+        meta: {
+            paginaAtual: pagina,
+            totalPaginas: totalPaginas,
+            totalItens: totalItens
+        }
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ROTA DE SAÍDAS ATUALIZADA COM PAGINAÇÃO
 app.get('/api/saidas', protegerRota, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM saidas ORDER BY data DESC');
-    res.json({ data: result.rows });
+    const pagina = parseInt(req.query.pagina || 1);
+    const limite = 20; // 20 itens por página
+    const offset = (pagina - 1) * limite;
+    
+    const dadosRes = await pool.query('SELECT * FROM saidas ORDER BY data DESC LIMIT $1 OFFSET $2', [limite, offset]);
+    
+    const totalRes = await pool.query('SELECT COUNT(*) AS total_itens FROM saidas');
+    const totalItens = parseInt(totalRes.rows[0].total_itens);
+    const totalPaginas = Math.ceil(totalItens / limite);
+
+    res.json({ 
+        data: dadosRes.rows,
+        meta: {
+            paginaAtual: pagina,
+            totalPaginas: totalPaginas,
+            totalItens: totalItens
+        }
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/estoque', protegerRota, async (req, res) => {
     const { produto, fornecedor_id, categoria_id, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
-    
     try {
         const catRes = await pool.query('SELECT tipo_unidade FROM categorias WHERE id = $1', [categoria_id]);
         if (catRes.rows.length === 0) return res.status(400).json({ error: 'Categoria não encontrada.' });
-        
         const tipo = catRes.rows[0].tipo_unidade;
         const totalUnidadesAdicionadas = tipo === 'rolo' ? pacotes : (pacotes * 5000) + unidadesAvulsas;
-
         const selectRes = await pool.query('SELECT * FROM estoque WHERE produto = $1 AND (fornecedor_id = $2 OR (fornecedor_id IS NULL AND $2 IS NULL))', [produto, fornecedor_id || null]);
-        
         if (selectRes.rows.length > 0) {
             const item = selectRes.rows[0];
             const novoTotalUnidades = item.totalunidades + totalUnidadesAdicionadas;
@@ -160,16 +196,12 @@ app.put('/api/estoque/:id', protegerRota, async (req, res) => {
   try {
     const { id } = req.params;
     const { fornecedor_id, categoria_id, pacotes, unidadesavulsas, custoporpacote, estoqueminimo } = req.body;
-    
     const catRes = await pool.query('SELECT tipo_unidade FROM categorias WHERE id = $1', [categoria_id]);
     if (catRes.rows.length === 0) return res.status(400).json({ error: 'Categoria não encontrada.' });
-    
     const tipo = catRes.rows[0].tipo_unidade;
     const totalunidades = tipo === 'rolo' ? pacotes : (pacotes * 5000) + unidadesavulsas;
-
     const updateQuery = `UPDATE estoque SET fornecedor_id = $1, pacotes = $2, unidadesavulsas = $3, totalunidades = $4, custoporpacote = $5, estoqueminimo = $6, categoria_id = $7 WHERE id = $8`;
     const result = await pool.query(updateQuery, [fornecedor_id, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, categoria_id, id]);
-    
     if (result.rowCount === 0) { return res.status(404).json({ error: 'Item não encontrado para editar.' }); }
     res.status(200).json({ message: 'Item atualizado com sucesso!' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -189,21 +221,17 @@ app.post('/api/saidas', protegerRota, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const estoqueRes = await client.query('SELECT e.*, c.tipo_unidade FROM estoque e JOIN categorias c ON e.categoria_id = c.id WHERE e.id = $1 FOR UPDATE', [produtoId]);
+    const estoqueRes = await client.query('SELECT e.*, c.tipo_unidade FROM estoque e LEFT JOIN categorias c ON e.categoria_id = c.id WHERE e.id = $1 FOR UPDATE', [produtoId]);
     if (estoqueRes.rows.length === 0) { throw new Error('Produto não encontrado no estoque.'); }
-    
     const item = estoqueRes.rows[0];
     if (item.totalunidades < totalUnidades) { throw new Error('Estoque insuficiente para esta saída.'); }
-    
     const tipo = item.tipo_unidade;
     const novoTotalUnidades = item.totalunidades - totalUnidades;
     const novosPacotes = tipo === 'rolo' ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000);
     const novasUnidadesAvulsas = tipo === 'rolo' ? 0 : novoTotalUnidades % 5000;
     const custoDaSaida = tipo === 'rolo' ? totalUnidades * item.custoporpacote : (totalUnidades / 5000) * item.custoporpacote;
-    
     await client.query('UPDATE estoque SET totalunidades = $1, pacotes = $2, unidadesavulsas = $3 WHERE id = $4', [novoTotalUnidades, novosPacotes, novasUnidadesAvulsas, produtoId]);
     await client.query('INSERT INTO saidas (data, produtoid, produtonome, totalunidades, custototal, destino) VALUES ($1, $2, $3, $4, $5, $6)', [data, produtoId, item.produto, totalUnidades, custoDaSaida, destino]);
-    
     await client.query('COMMIT');
     res.status(201).json({ message: 'Saída registrada com sucesso!' });
   } catch (err) {
@@ -216,8 +244,17 @@ app.post('/api/saidas', protegerRota, async (req, res) => {
 
 app.get('/api/fornecedores', protegerRota, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM fornecedores ORDER BY nome');
-    res.json({ data: result.rows });
+    const pagina = parseInt(req.query.pagina || 1);
+    const limite = 20;
+    const offset = (pagina - 1) * limite;
+    const dadosRes = await pool.query('SELECT * FROM fornecedores ORDER BY nome LIMIT $1 OFFSET $2', [limite, offset]);
+    const totalRes = await pool.query('SELECT COUNT(*) AS total_itens FROM fornecedores');
+    const totalItens = parseInt(totalRes.rows[0].total_itens);
+    const totalPaginas = Math.ceil(totalItens / limite);
+    res.json({ 
+        data: dadosRes.rows,
+        meta: { paginaAtual: pagina, totalPaginas: totalPaginas, totalItens: totalItens }
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -238,7 +275,6 @@ app.delete('/api/fornecedores/:id', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- NOVAS ROTAS PARA CATEGORIAS ---
 app.get('/api/categorias', protegerRota, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM categorias ORDER BY nome');
@@ -258,7 +294,6 @@ app.post('/api/categorias', protegerRota, async (req, res) => {
 app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
     try {
         const { id } = req.params;
-        // Verifica se a categoria está em uso antes de deletar
         const uso = await pool.query('SELECT 1 FROM estoque WHERE categoria_id = $1 LIMIT 1', [id]);
         if (uso.rows.length > 0) {
             return res.status(400).json({ error: 'Não é possível excluir: Categoria está em uso por um item de estoque.' });
@@ -267,7 +302,6 @@ app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
         res.status(200).json({ message: 'Categoria deletada com sucesso!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 
 app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
   try {
@@ -301,7 +335,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         const query = `
             SELECT up.produto_nome, up.data_inicio, up.data_fim, up.etiquetas_impressas, e.custoporpacote
             FROM uso_producao up
-            JOIN estoque e ON up.estoque_id = e.id
+            LEFT JOIN estoque e ON up.estoque_id = e.id
             WHERE up.status = 'Finalizado' ORDER BY up.data_fim DESC;
         `;
         const result = await pool.query(query);
@@ -330,7 +364,7 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const estoqueRes = await client.query('SELECT e.*, c.tipo_unidade FROM estoque e JOIN categorias c ON e.categoria_id = c.id WHERE e.id = $1 FOR UPDATE', [estoque_id]);
+        const estoqueRes = await client.query('SELECT e.*, c.tipo_unidade FROM estoque e LEFT JOIN categorias c ON e.categoria_id = c.id WHERE e.id = $1 FOR UPDATE', [estoque_id]);
         if (estoqueRes.rows.length === 0) throw new Error('Produto não encontrado no estoque.');
         const item = estoqueRes.rows[0];
         if (item.totalunidades < 1) throw new Error('Estoque insuficiente para iniciar o uso.');
