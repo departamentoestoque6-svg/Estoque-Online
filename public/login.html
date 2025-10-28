@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema de Estoque</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; box-sizing: border-box; }
+        .login-container { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 100%; }
+        h1 { color: #2c3e50; font-weight: 300; margin-bottom: 30px; }
+        .form-group { text-align: left; margin-bottom: 20px; }
+        label { font-weight: 600; color: #2c3e50; margin-bottom: 8px; font-size: 14px; display: block; }
+        input { width: 100%; padding: 12px; border: 2px solid #e9ecef; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+        input:focus { outline: none; border-color: #3498db; }
+        .btn { background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; transition: transform 0.2s; }
+        .btn:hover { transform: translateY(-2px); }
+        .toggle-form { color: #3498db; cursor: pointer; margin-top: 20px; font-size: 14px; display: block; }
+        #register-form { display: none; }
+        .error-message { padding: 10px; background: #f8d7da; color: #721c24; border-left: 3px solid #e74c3c; border-radius: 6px; margin-bottom: 20px; text-align: left; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <div id="login-form">
+            <h1>Login</h1>
+            <div id="loginError" class="error-message"></div>
+            <div class="form-group">
+                <label for="loginEmail">Email</label>
+                <input type="email" id="loginEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="loginSenha">Senha</label>
+                <input type="password" id="loginSenha" required>
+            </div>
+            <button class="btn" onclick="fazerLogin()">Entrar</button>
+            <a class="toggle-form" onclick="toggleForm()">Não tem uma conta? Registrar-se</a>
+        </div>
+
+        <div id="register-form">
+            <h1>Registrar Administrador</h1>
+            <div id="registerError" class="error-message"></div>
+            <div class="form-group">
+                <label for="registerEmail">Email</label>
+                <input type="email" id="registerEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="registerSenha">Senha</label>
+                <input type="password" id="registerSenha" required>
+            </div>
+            <button class="btn" onclick="fazerRegistro()">Registrar</button>
+            <a class="toggle-form" onclick="toggleForm()">Já tem uma conta? Fazer Login</a>
+        </div>
+    </div>
+
+    <script>
+        function toggleForm() {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const loginError = document.getElementById('loginError');
+            const registerError = document.getElementById('registerError');
+
+            loginError.style.display = 'none';
+            registerError.style.display = 'none';
+
+            if (loginForm.style.display === 'none') {
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+            }
+        }
+
+        async function fazerLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const senha = document.getElementById('loginSenha').value;
+            const errorDiv = document.getElementById('loginError');
+
+            try {
+                const response = await fetch('/api/usuarios/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+                
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || 'Erro desconhecido');
+                }
+                
+                localStorage.setItem('authToken', result.accessToken);
+                window.location.href = '/index.html'; // Redireciona para o app principal
+
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        async function fazerRegistro() {
+            const email = document.getElementById('registerEmail').value;
+            const senha = document.getElementById('registerSenha').value;
+            const errorDiv = document.getElementById('registerError');
+
+            try {
+                const response = await fetch('/api/usuarios/registrar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+                
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || 'Erro desconhecido');
+                }
+                
+                alert('Usuário administrador registrado com sucesso! Por favor, faça o login.');
+                toggleForm(); // Volta para a tela de login
+
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            }
+        }
+    </script>
+
+</body>
+</html>
