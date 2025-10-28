@@ -8,25 +8,101 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; min-height: 100vh; }
-        .sidebar { position: fixed; top: 0; left: -280px; width: 260px; height: 100%; background: #2c3e50; color: white; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transition: left 0.3s ease; z-index: 1100; }
-        .sidebar.active { left: 0; }
-        .sidebar h2 { text-align: center; font-weight: 300; border-bottom: 1px solid #4a627a; padding-bottom: 15px; margin-bottom: 20px; }
-        .tabs { display: flex; flex-direction: column; gap: 10px; }
-        .tab { display: block; width: 100%; padding: 15px 20px; cursor: pointer; background: transparent; border: none; font-size: 16px; font-weight: 600; color: #ecf0f1; text-align: left; transition: all 0.3s; border-radius: 8px; }
-        .tab:hover { background: #34495e; }
-        .tab.active { background: #3498db; color: white; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .main-content { margin-left: 0; padding: 20px; transition: margin-left 0.3s ease; width: 100%; }
-        .sidebar.active + .main-content { margin-left: 260px; }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px; /* Começa escondido */
+            width: 260px;
+            height: 100%;
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            transition: left 0.3s ease;
+            z-index: 1100;
+            overflow-y: auto;
+        }
+        .sidebar.active {
+            left: 0;
+        }
+        .sidebar h2 {
+            text-align: center;
+            font-weight: 300;
+            border-bottom: 1px solid #4a627a;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .tab {
+            display: block;
+            width: 100%;
+            padding: 15px 20px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #ecf0f1;
+            text-align: left;
+            transition: all 0.3s;
+            border-radius: 8px;
+        }
+        .tab:hover {
+            background: #34495e;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        .main-content {
+            margin-left: 0;
+            padding: 20px;
+            transition: margin-left 0.3s ease;
+            width: 100%;
+        }
+        .sidebar.active + .main-content {
+            margin-left: 260px;
+        }
+        
         .header { background: white; color: #2c3e50; padding: 15px 20px; text-align: center; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 15px; }
         .header h1 { font-size: 1.8em; font-weight: 400; margin: 0; }
         .save-status { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); background: #ecf0f1; color: #34495e; padding: 8px 15px; border-radius: 20px; font-size: 12px; }
         .btn-logout { position: absolute; top: 50%; right: 140px; transform: translateY(-50%); background: #e74c3c; color: white; padding: 8px 15px; border: none; border-radius: 20px; font-size: 12px; cursor: pointer; }
-        .hamburger-btn { position: fixed; top: 20px; left: 20px; font-size: 28px; background: #34495e; color: white; border: none; cursor: pointer; padding: 5px 12px; border-radius: 8px; z-index: 1200; transition: left 0.3s ease; }
-        .sidebar.active ~ .hamburger-btn { left: 280px; }
+        
+        .hamburger-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 28px;
+            background: #34495e;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: 8px;
+            z-index: 1200;
+            transition: left 0.3s ease;
+        }
+        .sidebar.active ~ .hamburger-btn {
+            left: 280px;
+        }
+        
         .container { max-width: 1900px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; margin-top: 80px; }
         .content { padding: 30px; }
+        
         .section, .chart-container { background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid #3498db; }
         .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
         .form-group { display: flex; flex-direction: column; }
@@ -388,7 +464,7 @@
                     fetch(`${API_URL}/fornecedores?pagina=${paginacao.fornecedores.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/producao/em-uso`, { headers: authHeaders }),
                     fetch(`${API_URL}/categorias`, { headers: authHeaders }),
-                    fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders })
+                    fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders }) // <-- NOVO
                 ]);
                 
                 if (estRes.status === 401 || estRes.status === 403) { return fazerLogout(); }
@@ -399,7 +475,7 @@
                 const statsData = await staRes.json();
                 const fornecedoresData = await fornRes.json();
                 const emUsoData = await usoRes.json();
-                const prefData = await prefRes.json();
+                const prefData = await prefRes.json(); // <-- NOVO
                 
                 estoque = estoqueData.data;
                 paginacao.estoque = estoqueData.meta;
@@ -410,7 +486,7 @@
                 emUso = emUsoData.data;
                 categorias = (await catRes.json()).data;
                 
-                document.getElementById('checkAlertasEmail').checked = prefData.receber_alertas;
+                document.getElementById('checkAlertasEmail').checked = prefData.receber_alertas; // <-- NOVO
 
                 document.getElementById('saveStatus').textContent = 'Pronto';
                 atualizarDashboard(statsData);
@@ -492,12 +568,26 @@
             else { lblPacotes.innerHTML = 'Pacotes <span style="color: red;">*</span>'; lblCusto.innerHTML = 'Custo/Pacote (R$) <span style="color: red;">*</span>'; grpUnidades.style.display = 'flex'; } 
         }
         async function adicionarEstoque(){ const selCat = document.getElementById('estoqueCategoriaId'); if (!selCat.value) return mostrarMensagem('Por favor, selecione uma categoria.', 'error'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('estoqueUnidades').value) || 0); const item = { produto: document.getElementById('estoqueProduto').value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesAvulsas: unidades, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || !item.categoria_id || (!item.pacotes && !item.unidadesAvulsas && tipo !== 'rolo') || (tipo === 'rolo' && !item.pacotes) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
-        function editarEstoque(index){ const item = estoque[index]; document.getElementById('editId').value = item.id; document.getElementById('editProduto').value = item.produto; popularDropdownFornecedores('editFornecedorId', item.fornecedor_id); popularDropdownCategorias('editCategoriaId', item.categoria_id); setTimeout(() => ajustarCamposProduto('edit'), 100); document.getElementById('editPacotes').value = item.pacotes; document.getElementById('editUnidades').value = item.unidadesavulsas; document.getElementById('editCusto').value = item.custoporpacote; document.getElementById('editMinimo').value = item.estoqueminimo; document.getElementById('modalEdicao').style.display = 'block'; }
+        function editarEstoque(index){ 
+            const itemOriginal = estoque[index];
+            const itemGlobal = estoque.find(i => i.id === itemOriginal.id); 
+            if (!itemGlobal) { console.error("Item não encontrado para edição."); return; }
+            document.getElementById('editId').value = itemGlobal.id; 
+            document.getElementById('editProduto').value = itemGlobal.produto; 
+            popularDropdownFornecedores('editFornecedorId', itemGlobal.fornecedor_id); 
+            popularDropdownCategorias('editCategoriaId', itemGlobal.categoria_id); 
+            setTimeout(() => ajustarCamposProduto('edit'), 100); 
+            document.getElementById('editPacotes').value = itemGlobal.pacotes; 
+            document.getElementById('editUnidades').value = itemGlobal.unidadesavulsas; 
+            document.getElementById('editCusto').value = itemGlobal.custoporpacote; 
+            document.getElementById('editMinimo').value = itemGlobal.estoqueminimo; 
+            document.getElementById('modalEdicao').style.display = 'block'; 
+        }
         async function salvarEdicao(){ const id = document.getElementById('editId').value; const selCat = document.getElementById('editCategoriaId'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('editPacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('editUnidades').value) || 0); const dados = { fornecedor_id: document.getElementById('editFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesavulsas: unidades, custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0, estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0 }; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(dados) }); if (!res.ok) throw new Error('Falha ao salvar as alterações.'); mostrarMensagem('Item atualizado com sucesso!', 'success'); fecharModal(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function excluirEstoque(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE', headers: authHeaders }); if (!res.ok) throw new Error('Falha ao deletar o item.'); mostrarMensagem('Item deletado com sucesso!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
         // --- FUNÇÕES DE SAÍDA ---
-        async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const itemEstoque = estoque.find(i => i.id === pId); if (!itemEstoque) return mostrarMensagem('Produto não encontrado.', 'error'); const cat = categorias.find(c => c.id === itemEstoque.categoria_id); const tipo = cat ? cat.tipo_unidade : 'cartela'; let total; if(tipo === 'rolo') { total = parseInt(document.getElementById('saidaPacotes').value) || 0; } else { total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); } if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const res = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) }); const result = await res.json(); if (!res.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const res = await fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders }); const todosItens = (await res.json()).data; const itemEstoque = todosItens.find(i => i.id === pId); if (!itemEstoque) return mostrarMensagem('Produto não encontrado.', 'error'); const cat = categorias.find(c => c.id === itemEstoque.categoria_id); const tipo = cat ? cat.tipo_unidade : 'cartela'; let total; if(tipo === 'rolo') { total = parseInt(document.getElementById('saidaPacotes').value) || 0; } else { total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); } if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const resPost = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) }); const result = await resPost.json(); if (!resPost.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
         // --- FUNÇÕES DE FORNECEDORES ---
         async function adicionarFornecedor(){ const nomeIn = document.getElementById('fornecedorNome'); const nome = nomeIn.value.trim(); if (!nome) return mostrarMensagem('O nome do fornecedor é obrigatório.', 'error'); try { const res = await fetch('/api/fornecedores', { method: 'POST', headers: authHeaders, body: JSON.stringify({ nome }) }); if (!res.ok) throw new Error('Falha ao adicionar fornecedor'); nomeIn.value = ''; await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
@@ -557,13 +647,20 @@
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('mainContent').classList.toggle('active'); document.querySelector('.hamburger-btn').classList.toggle('active'); }
         function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else if (aba !== 'conta') { atualizarTodaUI(); } if (window.innerWidth < 768) { toggleMenu(); } }
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
-        function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.categoria_nome || '-'}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
+        function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item, index) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${index})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.categoria_nome || '-'}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
         function renderizarFornecedores(){ const tbody = document.getElementById('tabelaFornecedores'); tbody.innerHTML = ''; fornecedores.forEach(f => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
         function popularDropdownFornecedores(selectId, selValue = null){ const sel = document.getElementById(selectId); if (!sel) return; const curVal = sel.value; sel.innerHTML = '<option value="">Sem Fornecedor</option>'; fornecedores.forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = f.nome; sel.appendChild(opt); }); sel.value = selValue || curVal; }
         function popularDropdownProducao() { const sel = document.getElementById('producaoProduto'); sel.innerHTML = '<option value="">Selecione um rolo...</option>'; estoque.forEach(i => { const cat = categorias.find(c => c.id === i.categoria_id); if (cat && cat.tipo_unidade === 'rolo' && i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${i.totalunidades})`; sel.appendChild(opt); } }); }
         function renderizarProducaoEmUso() { const tbody = document.getElementById('tabelaProducaoEmUso'); tbody.innerHTML = ''; emUso.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto_nome}</td><td>${formatarData(i.data_inicio)}</td><td><button class="btn-success" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="finalizarProducao(${i.id})">Finalizar Uso</button></td>`; tbody.appendChild(tr); }); }
-        function atualizarProdutosDisponiveis(){ const sel = document.getElementById('saidaProduto'); sel.innerHTML = '<option value="">Selecione...</option>'; estoque.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); }
+        async function atualizarProdutosDisponiveis(){ 
+            const res = await fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders }); 
+            if(res.status === 401 || res.status === 403) return fazerLogout();
+            const dadosCompletos = (await res.json()).data;
+            const sel = document.getElementById('saidaProduto'); 
+            sel.innerHTML = '<option value="">Selecione...</option>'; 
+            dadosCompletos.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); 
+        }
         
         function limparFormEstoque(){ document.getElementById('estoqueProduto').value = ''; document.getElementById('estoqueFornecedorId').value = ''; document.getElementById('estoqueCategoriaId').value = ''; document.getElementById('estoquePacotes').value = '0'; document.getElementById('estoqueUnidades').value = '0'; document.getElementById('estoqueCusto').value = ''; document.getElementById('estoqueMinimo').value = ''; document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0]; ajustarCamposProduto(); }
         function limparFormSaida(){ document.getElementById('saidaProduto').value = ''; document.getElementById('saidaData').value = new Date().toISOString().split('T')[0]; document.getElementById('saidaPacotes').value = '0'; document.getElementById('saidaUnidades').value = '0'; document.getElementById('saidaDestino').value = ''; }
@@ -587,6 +684,7 @@
             document.getElementById('relatorioDe').value = hoje;
             document.getElementById('relatorioAte').value = hoje;
             document.getElementById('producaoDataInicio').value = hoje;
+            document.getElementById('finalizarDataFim').value = hoje;
             ajustarCamposProduto();
             carregarDados();
             pedirPermissaoDeNotificacao();
