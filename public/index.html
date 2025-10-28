@@ -7,18 +7,94 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-        .container { max-width: 1900px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
-        .header { background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 25px; text-align: center; position: relative; }
-        .header h1 { font-size: 2.2em; font-weight: 300; }
-        .save-status { position: absolute; top: 15px; right: 20px; background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 20px; font-size: 12px; }
-        .btn-logout { position: absolute; top: 15px; left: 20px; background: #e74c3c; color: white; padding: 8px 15px; border: none; border-radius: 20px; font-size: 12px; cursor: pointer; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; min-height: 100vh; }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px; /* Começa escondido */
+            width: 260px;
+            height: 100%;
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            transition: left 0.3s ease;
+            z-index: 1100;
+        }
+        .sidebar.active {
+            left: 0;
+        }
+        .sidebar h2 {
+            text-align: center;
+            font-weight: 300;
+            border-bottom: 1px solid #4a627a;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .tab {
+            display: block;
+            width: 100%;
+            padding: 15px 20px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #ecf0f1;
+            text-align: left;
+            transition: all 0.3s;
+            border-radius: 8px;
+        }
+        .tab:hover {
+            background: #34495e;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .main-content {
+            margin-left: 0;
+            padding: 20px;
+            transition: margin-left 0.3s ease;
+            width: 100%;
+        }
+        .sidebar.active + .main-content {
+            margin-left: 260px;
+        }
+        
+        .header { background: white; color: #2c3e50; padding: 15px 20px; text-align: center; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 15px; }
+        .header h1 { font-size: 1.8em; font-weight: 400; margin: 0; }
+        .save-status { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); background: #ecf0f1; color: #34495e; padding: 8px 15px; border-radius: 20px; font-size: 12px; }
+        .btn-logout { position: absolute; top: 50%; right: 140px; transform: translateY(-50%); background: #e74c3c; color: white; padding: 8px 15px; border: none; border-radius: 20px; font-size: 12px; cursor: pointer; }
+        
+        .hamburger-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 28px;
+            background: #34495e;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: 8px;
+            z-index: 1200;
+            transition: left 0.3s ease;
+        }
+        .sidebar.active ~ .hamburger-btn {
+            left: 280px;
+        }
+        
+        .container { max-width: 1900px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; margin-top: 80px; }
         .content { padding: 30px; }
-        .tabs { display: flex; margin-bottom: 30px; border-bottom: 2px solid #e9ecef; flex-wrap: wrap; gap: 5px; }
-        .tab { padding: 15px 25px; cursor: pointer; background: #f8f9fa; border: none; font-size: 16px; font-weight: 600; color: #666; transition: all 0.3s; border-radius: 8px 8px 0 0; }
-        .tab.active { background: #3498db; color: white; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        
         .section, .chart-container { background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid #3498db; }
         .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
         .form-group { display: flex; flex-direction: column; }
@@ -62,202 +138,232 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    
+    <button class="hamburger-btn" onclick="toggleMenu()">☰</button>
+
+    <div class="sidebar" id="sidebar">
+        <h2>Menu</h2>
+        <div class="tabs">
+            <button class="tab active" onclick="trocarAba('dashboard')">Dashboard</button>
+            <button class="tab" onclick="trocarAba('estoque')">Estoque</button>
+            <button class="tab" onclick="trocarAba('saida')">Consumo Geral</button>
+            <button class="tab" onclick="trocarAba('producao')">Produção</button>
+            <button class="tab" onclick="trocarAba('fornecedores')">Fornecedores</button>
+            <button class="tab" onclick="trocarAba('categorias')">Categorias</button>
+            <button class="tab" onclick="trocarAba('relatorios')">Relatórios</button>
+            <button class="tab" onclick="trocarAba('conta')">Minha Conta</button>
+        </div>
+    </div>
+
+    <div class="main-content" id="mainContent">
         <div class="header">
             <button class="btn-logout" onclick="fazerLogout()">Sair</button>
             <h1>Sistema de Controle de Estoque Online</h1>
             <div class="save-status" id="saveStatus">Carregando...</div>
         </div>
-        <div class="content">
-            <div class="tabs">
-                <button class="tab active" onclick="trocarAba('dashboard')">Dashboard</button>
-                <button class="tab" onclick="trocarAba('estoque')">Estoque</button>
-                <button class="tab" onclick="trocarAba('saida')">Consumo Geral</button>
-                <button class="tab" onclick="trocarAba('fornecedores')">Fornecedores</button>
-                <button class="tab" onclick="trocarAba('producao')">Produção</button>
-                <button class="tab" onclick="trocarAba('categorias')">Categorias</button>
-                <button class="tab" onclick="trocarAba('relatorios')">Relatórios</button>
-            </div>
-            <div class="success-message" id="successMessage"></div>
-            <div class="error-message" id="errorMessage"></div>
-            
-            <div id="aba-dashboard" class="tab-content active">
-                <div class="summary-cards">
-                    <div class="card card-success"><h3>Total em Estoque</h3><div class="value" id="dashTotalEstoque">0 un</div></div>
-                    <div class="card card-warning"><h3>Valor do Estoque</h3><div class="value" id="dashValorEstoque">R$ 0,00</div></div>
-                    <div class="card card-danger card-clickable" onclick="mostrarItensCriticos()"><h3>Itens Críticos</h3><div class="value" id="dashCriticos">0</div></div>
-                </div>
-                <div class="chart-container">
-                    <h3>Top 5 Produtos com Maior Estoque</h3>
-                    <canvas id="graficoEstoque"></canvas>
-                </div>
-            </div>
-            
-            <div id="aba-estoque" class="tab-content">
-                <div class="section">
-                    <h3>Entrada de Estoque</h3>
-                    <div class="form-row">
-                        <div class="form-group"><label for="estoqueProduto">Nome do Produto <span style="color: red;">*</span></label><input type="text" id="estoqueProduto" placeholder="Ex: Papel Adesivo"></div>
-                        <div class="form-group"><label for="estoqueCategoriaId">Categoria <span style="color: red;">*</span></label><select id="estoqueCategoriaId" onchange="ajustarCamposProduto()"><option value="">Selecione...</option></select></div>
-                        <div class="form-group"><label for="estoqueFornecedorId">Fornecedor</label><select id="estoqueFornecedorId"><option value="">Sem Fornecedor</option></select></div>
+        <div class="container">
+            <div class="content">
+                <div class="success-message" id="successMessage"></div>
+                <div class="error-message" id="errorMessage"></div>
+                
+                <div id="aba-dashboard" class="tab-content active">
+                    <div class="summary-cards">
+                        <div class="card card-success"><h3>Total em Estoque</h3><div class="value" id="dashTotalEstoque">0 un</div></div>
+                        <div class="card card-warning"><h3>Valor do Estoque</h3><div class="value" id="dashValorEstoque">R$ 0,00</div></div>
+                        <div class="card card-danger card-clickable" onclick="mostrarItensCriticos()"><h3>Itens Críticos</h3><div class="value" id="dashCriticos">0</div></div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group"><label for="estoquePacotes" id="labelPacotes">Pacotes <span style="color: red;">*</span></label><input type="number" id="estoquePacotes" placeholder="0" min="0" value="0"></div>
-                        <div class="form-group" id="groupUnidadesAvulsas"><label for="estoqueUnidades">Unidades Avulsas</label><input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0"></div>
-                        <div class="form-group"><label for="estoqueCusto" id="labelCusto">Custo/Pacote (R$) <span style="color: red;">*</span></label><input type="number" step="0.01" id="estoqueCusto" placeholder="45.00" min="0"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label for="estoqueMinimo">Estoque Mínimo (un)</label><input type="number" id="estoqueMinimo" placeholder="5000" min="0"></div>
-                        <div class="form-group"><label for="estoqueData">Data da Compra</label><input type="date" id="estoqueData"></div>
-                    </div>
-                    <button class="btn btn-success" onclick="adicionarEstoque()">Adicionar / Atualizar Estoque</button>
-                </div>
-                <div class="section">
-                    <h3>Filtros</h3>
-                    <div class="form-row">
-                        <div class="form-group"><label for="filtroTexto">Buscar por Nome</label><input type="text" id="filtroTexto" onkeyup="renderizarEstoque()" placeholder="Digite o nome do produto..."></div>
-                        <div class="form-group"><label for="filtroStatus">Filtrar por Status</label><select id="filtroStatus" onchange="renderizarEstoque()"><option value="todos">Todos</option><option value="ok">OK</option><option value="baixo">Baixo</option><option value="critico">Crítico</option></select></div>
+                    <div class="chart-container">
+                        <h3>Top 5 Produtos com Maior Estoque</h3>
+                        <canvas id="graficoEstoque"></canvas>
                     </div>
                 </div>
-                <div class="table-container">
-                    <table>
-                        <thead><tr><th class="sortable" onclick="ordenarPor('acoes')">Ações</th><th class="sortable" onclick="ordenarPor('status')">Status <span id="arrow-status" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('produto')">Produto <span id="arrow-produto" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('categoria_nome')">Categoria <span id="arrow-categoria_nome" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('fornecedor_nome')">Fornecedor <span id="arrow-fornecedor_nome" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('totalunidades')">Total (un) <span id="arrow-totalunidades" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('custoporpacote')">Custo/Pacote <span id="arrow-custoporpacote" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('ultimaentrada')">Última Entrada <span id="arrow-ultimaentrada" class="sort-arrow"></span></th></tr></thead>
-                        <tbody id="tabelaEstoque"></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="paginacaoEstoque">
-                    <button id="btnEstoqueAnterior" onclick="mudarPagina('estoque', -1)">Anterior</button>
-                    <span id="infoPaginaEstoque">Página 1 de 1</span>
-                    <button id="btnEstoqueProxima" onclick="mudarPagina('estoque', 1)">Próxima</button>
-                </div>
-            </div>
-            <div id="aba-saida" class="tab-content">
-                 <div class="section">
-                    <h3>Registrar Consumo Geral</h3>
-                    <div class="form-row">
-                        <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto"></select></div>
-                        <div class="form-group"><label for="saidaData">Data <span style="color: red;">*</span></label><input type="date" id="saidaData"></div>
-                        <div class="form-group"><label for="saidaPacotes">Pacotes</label><input type="number" id="saidaPacotes" value="0" min="0"></div>
-                        <div class="form-group"><label for="saidaUnidades">Unidades</label><input type="number" id="saidaUnidades" value="0" min="0"></div>
-                         <div class="form-group"><label for="saidaDestino">Destino/Motivo</label><input type="text" id="saidaDestino" placeholder="Ex: Perda, Uso diverso..."></div>
-                    </div>
-                    <button class="btn btn-success" onclick="registrarSaida()">Registrar Consumo</button>
-                </div>
-                 <div class="table-container">
-                    <h3>Histórico de Consumo</h3>
-                    <table>
-                        <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino/Motivo</th></tr></thead>
-                        <tbody id="tabelaSaida"></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="paginacaoSaida">
-                    <button id="btnSaidaAnterior" onclick="mudarPagina('saida', -1)">Anterior</button>
-                    <span id="infoPaginaSaida">Página 1 de 1</span>
-                    <button id="btnSaidaProxima" onclick="mudarPagina('saida', 1)">Próxima</button>
-                </div>
-            </div>
-            <div id="aba-fornecedores" class="tab-content">
-                <div class="section">
-                    <h3>Novo Fornecedor</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="fornecedorNome">Nome do Fornecedor <span style="color: red;">*</span></label>
-                            <input type="text" id="fornecedorNome" placeholder="Digite o nome">
+                
+                <div id="aba-estoque" class="tab-content">
+                    <div class="section">
+                        <h3>Entrada de Estoque</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label for="estoqueProduto">Nome do Produto <span style="color: red;">*</span></label><input type="text" id="estoqueProduto" placeholder="Ex: Papel Adesivo"></div>
+                            <div class="form-group"><label for="estoqueCategoriaId">Categoria <span style="color: red;">*</span></label><select id="estoqueCategoriaId" onchange="ajustarCamposProduto()"><option value="">Selecione...</option></select></div>
+                            <div class="form-group"><label for="estoqueFornecedorId">Fornecedor</label><select id="estoqueFornecedorId"><option value="">Sem Fornecedor</option></select></div>
                         </div>
-                        <div class="form-group" style="justify-content: flex-end;">
-                            <button class="btn btn-success" onclick="adicionarFornecedor()">Adicionar Fornecedor</button>
+                        <div class="form-row">
+                            <div class="form-group"><label for="estoquePacotes" id="labelPacotes">Pacotes <span style="color: red;">*</span></label><input type="number" id="estoquePacotes" placeholder="0" min="0" value="0"></div>
+                            <div class="form-group" id="groupUnidadesAvulsas"><label for="estoqueUnidades">Unidades Avulsas</label><input type="number" id="estoqueUnidades" placeholder="0" min="0" value="0"></div>
+                            <div class="form-group"><label for="estoqueCusto" id="labelCusto">Custo/Pacote (R$) <span style="color: red;">*</span></label><input type="number" step="0.01" id="estoqueCusto" placeholder="45.00" min="0"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label for="estoqueMinimo">Estoque Mínimo (un)</label><input type="number" id="estoqueMinimo" placeholder="5000" min="0"></div>
+                            <div class="form-group"><label for="estoqueData">Data da Compra</label><input type="date" id="estoqueData"></div>
+                        </div>
+                        <button class="btn btn-success" onclick="adicionarEstoque()">Adicionar / Atualizar Estoque</button>
+                    </div>
+                    <div class="section">
+                        <h3>Filtros</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label for="filtroTexto">Buscar por Nome</label><input type="text" id="filtroTexto" onkeyup="renderizarEstoque()" placeholder="Digite o nome do produto..."></div>
+                            <div class="form-group"><label for="filtroStatus">Filtrar por Status</label><select id="filtroStatus" onchange="renderizarEstoque()"><option value="todos">Todos</option><option value="ok">OK</option><option value="baixo">Baixo</option><option value="critico">Crítico</option></select></div>
                         </div>
                     </div>
-                </div>
-                <div class="table-container">
-                    <h3>Fornecedores Cadastrados</h3>
-                    <table>
-                        <thead><tr><th>Nome</th><th>Ações</th></tr></thead>
-                        <tbody id="tabelaFornecedores"></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="paginacaoFornecedores">
-                    <button id="btnFornecedoresAnterior" onclick="mudarPagina('fornecedores', -1)">Anterior</button>
-                    <span id="infoPaginaFornecedores">Página 1 de 1</span>
-                    <button id="btnFornecedoresProxima" onclick="mudarPagina('fornecedores', 1)">Próxima</button>
-                </div>
-            </div>
-             <div id="aba-producao" class="tab-content">
-                <div class="section">
-                    <h3>Iniciar Uso de Rolo em Produção</h3>
-                    <div class="form-row">
-                        <div class="form-group"><label for="producaoProduto">Selecionar Rolo do Estoque <span style="color: red;">*</span></label><select id="producaoProduto"></select></div>
-                        <div class="form-group"><label for="producaoDataInicio">Data de Início <span style="color: red;">*</span></label><input type="date" id="producaoDataInicio"></div>
-                        <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-success" onclick="iniciarProducao()">Iniciar Uso</button></div>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <h3>Rolos Atualmente em Uso</h3>
-                    <table>
-                        <thead><tr><th>Produto</th><th>Data de Início</th><th>Ações</th></tr></thead>
-                        <tbody id="tabelaProducaoEmUso"></tbody>
-                    </table>
-                </div>
-            </div>
-            <div id="aba-categorias" class="tab-content">
-                <div class="section">
-                    <h3>Nova Categoria</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="categoriaNome">Nome da Categoria <span style="color: red;">*</span></label>
-                            <input type="text" id="categoriaNome" placeholder="Ex: Rolos">
-                        </div>
-                        <div class="form-group">
-                            <label for="categoriaTipo">Tipo de Unidade <span style="color: red;">*</span></label>
-                            <select id="categoriaTipo">
-                                <option value="cartela">Cartela (Pacotes de 5000un)</option>
-                                <option value="rolo">Rolo (Unidade individual)</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="justify-content: flex-end;">
-                            <button class="btn btn-success" onclick="adicionarCategoria()">Adicionar Categoria</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <h3>Categorias Cadastradas</h3>
-                    <table>
-                        <thead><tr><th>Nome</th><th>Tipo de Unidade</th><th>Ações</th></tr></thead>
-                        <tbody id="tabelaCategorias"></tbody>
-                    </table>
-                </div>
-            </div>
-            <div id="aba-relatorios" class="tab-content">
-                <div class="section">
-                    <h3>Relatório de Saídas por Período</h3>
-                    <div class="form-row">
-                        <div class="form-group"><label for="relatorioDe">De:</label><input type="date" id="relatorioDe"></div>
-                        <div class="form-group"><label for="relatorioAte">Até:</label><input type="date" id="relatorioAte"></div>
-                        <div class="form-group" style="justify-content: flex-end;"><button class="btn" onclick="gerarRelatorioSaidas()">Gerar Relatório</button></div>
-                    </div>
-                    <div class="table-container">
-                        <table id="tabelaRelatorioSaidas">
-                            <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino</th></tr></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="section">
-                    <h3>Histórico de Rolos Finalizados</h3>
                     <div class="table-container">
                         <table>
-                            <thead><tr><th>Produto</th><th>Data Início</th><th>Data Fim</th><th>Dias Úteis</th><th>Custo/Dia (R$)</th><th>Média Etiq./Dia</th></tr></thead>
-                            <tbody id="tabelaHistoricoUso"></tbody>
+                            <thead><tr><th class="sortable" onclick="ordenarPor('acoes')">Ações</th><th class="sortable" onclick="ordenarPor('status')">Status <span id="arrow-status" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('produto')">Produto <span id="arrow-produto" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('categoria_nome')">Categoria <span id="arrow-categoria_nome" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('fornecedor_nome')">Fornecedor <span id="arrow-fornecedor_nome" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('totalunidades')">Total (un) <span id="arrow-totalunidades" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('custoporpacote')">Custo/Pacote <span id="arrow-custoporpacote" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('ultimaentrada')">Última Entrada <span id="arrow-ultimaentrada" class="sort-arrow"></span></th></tr></thead>
+                            <tbody id="tabelaEstoque"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="paginacaoEstoque">
+                        <button id="btnEstoqueAnterior" onclick="mudarPagina('estoque', -1)">Anterior</button>
+                        <span id="infoPaginaEstoque">Página 1 de 1</span>
+                        <button id="btnEstoqueProxima" onclick="mudarPagina('estoque', 1)">Próxima</button>
+                    </div>
+                </div>
+                <div id="aba-saida" class="tab-content">
+                     <div class="section">
+                        <h3>Registrar Consumo Geral</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto"></select></div>
+                            <div class="form-group"><label for="saidaData">Data <span style="color: red;">*</span></label><input type="date" id="saidaData"></div>
+                            <div class="form-group"><label for="saidaPacotes">Pacotes</label><input type="number" id="saidaPacotes" value="0" min="0"></div>
+                            <div class="form-group"><label for="saidaUnidades">Unidades</label><input type="number" id="saidaUnidades" value="0" min="0"></div>
+                             <div class="form-group"><label for="saidaDestino">Destino/Motivo</label><input type="text" id="saidaDestino" placeholder="Ex: Perda, Uso diverso..."></div>
+                        </div>
+                        <button class="btn btn-success" onclick="registrarSaida()">Registrar Consumo</button>
+                    </div>
+                     <div class="table-container">
+                        <h3>Histórico de Consumo</h3>
+                        <table>
+                            <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino/Motivo</th></tr></thead>
+                            <tbody id="tabelaSaida"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="paginacaoSaida">
+                        <button id="btnSaidaAnterior" onclick="mudarPagina('saida', -1)">Anterior</button>
+                        <span id="infoPaginaSaida">Página 1 de 1</span>
+                        <button id="btnSaidaProxima" onclick="mudarPagina('saida', 1)">Próxima</button>
+                    </div>
+                </div>
+                <div id="aba-fornecedores" class="tab-content">
+                    <div class="section">
+                        <h3>Novo Fornecedor</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="fornecedorNome">Nome do Fornecedor <span style="color: red;">*</span></label>
+                                <input type="text" id="fornecedorNome" placeholder="Digite o nome">
+                            </div>
+                            <div class="form-group" style="justify-content: flex-end;">
+                                <button class="btn btn-success" onclick="adicionarFornecedor()">Adicionar Fornecedor</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <h3>Fornecedores Cadastrados</h3>
+                        <table>
+                            <thead><tr><th>Nome</th><th>Ações</th></tr></thead>
+                            <tbody id="tabelaFornecedores"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="paginacaoFornecedores">
+                        <button id="btnFornecedoresAnterior" onclick="mudarPagina('fornecedores', -1)">Anterior</button>
+                        <span id="infoPaginaFornecedores">Página 1 de 1</span>
+                        <button id="btnFornecedoresProxima" onclick="mudarPagina('fornecedores', 1)">Próxima</button>
+                    </div>
+                </div>
+                 <div id="aba-producao" class="tab-content">
+                    <div class="section">
+                        <h3>Iniciar Uso de Rolo em Produção</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label for="producaoProduto">Selecionar Rolo do Estoque <span style="color: red;">*</span></label><select id="producaoProduto"></select></div>
+                            <div class="form-group"><label for="producaoDataInicio">Data de Início <span style="color: red;">*</span></label><input type="date" id="producaoDataInicio"></div>
+                            <div class="form-group" style="justify-content: flex-end;"><button class="btn btn-success" onclick="iniciarProducao()">Iniciar Uso</button></div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <h3>Rolos Atualmente em Uso</h3>
+                        <table>
+                            <thead><tr><th>Produto</th><th>Data de Início</th><th>Ações</th></tr></thead>
+                            <tbody id="tabelaProducaoEmUso"></tbody>
                         </table>
                     </div>
                 </div>
-                <div class="section">
-                    <h3>Relatório de Valor de Estoque por Produto</h3>
+                <div id="aba-categorias" class="tab-content">
+                    <div class="section">
+                        <h3>Nova Categoria</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="categoriaNome">Nome da Categoria <span style="color: red;">*</span></label>
+                                <input type="text" id="categoriaNome" placeholder="Ex: Rolos">
+                            </div>
+                            <div class="form-group">
+                                <label for="categoriaTipo">Tipo de Unidade <span style="color: red;">*</span></label>
+                                <select id="categoriaTipo">
+                                    <option value="cartela">Cartela (Pacotes de 5000un)</option>
+                                    <option value="rolo">Rolo (Unidade individual)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="justify-content: flex-end;">
+                                <button class="btn btn-success" onclick="adicionarCategoria()">Adicionar Categoria</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="table-container">
-                        <table id="tabelaRelatorioValor">
-                            <thead><tr><th>Produto</th><th>Total (un)</th><th>Valor Total em Estoque (R$)</th></tr></thead>
-                            <tbody id="tabelaRelatorioValorTbody"></tbody>
+                        <h3>Categorias Cadastradas</h3>
+                        <table>
+                            <thead><tr><th>Nome</th><th>Tipo de Unidade</th><th>Ações</th></tr></thead>
+                            <tbody id="tabelaCategorias"></tbody>
                         </table>
+                    </div>
+                </div>
+                <div id="aba-relatorios" class="tab-content">
+                    <div class="section">
+                        <h3>Relatório de Saídas por Período</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label for="relatorioDe">De:</label><input type="date" id="relatorioDe"></div>
+                            <div class="form-group"><label for="relatorioAte">Até:</label><input type="date" id="relatorioAte"></div>
+                            <div class="form-group" style="justify-content: flex-end;"><button class="btn" onclick="gerarRelatorioSaidas()">Gerar Relatório</button></div>
+                        </div>
+                        <div class="table-container">
+                            <table id="tabelaRelatorioSaidas">
+                                <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="section">
+                        <h3>Histórico de Rolos Finalizados</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>Produto</th><th>Data Início</th><th>Data Fim</th><th>Dias Úteis</th><th>Custo/Dia (R$)</th><th>Média Etiq./Dia</th></tr></thead>
+                                <tbody id="tabelaHistoricoUso"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="section">
+                        <h3>Relatório de Valor de Estoque por Produto</h3>
+                        <div class="table-container">
+                            <table id="tabelaRelatorioValor">
+                                <thead><tr><th>Produto</th><th>Total (un)</th><th>Valor Total em Estoque (R$)</th></tr></thead>
+                                <tbody id="tabelaRelatorioValorTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div id="aba-conta" class="tab-content">
+                    <div class="section">
+                        <h3>Alterar Senha</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="senhaAtual">Senha Atual <span style="color: red;">*</span></label>
+                                <input type="password" id="senhaAtual">
+                            </div>
+                            <div class="form-group">
+                                <label for="novaSenha">Nova Senha <span style="color: red;">*</span></label>
+                                <input type="password" id="novaSenha">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmaNovaSenha">Confirmar Nova Senha <span style="color: red;">*</span></label>
+                                <input type="password" id="confirmaNovaSenha">
+                            </div>
+                        </div>
+                        <button class="btn btn-success" onclick="alterarSenha()">Salvar Nova Senha</button>
                     </div>
                 </div>
             </div>
@@ -326,7 +432,7 @@
 
         // --- FUNÇÕES DE NOTIFICAÇÃO ---
         function pedirPermissaoDeNotificacao(){ if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') { Notification.requestPermission().then(p => { if (p === 'granted') console.log('Permissão para notificações concedida!'); }); } }
-        async function verificarAlertas(){ try { const res = await fetch(`${API_URL}/alertas/estoque-baixo`, { headers: authHeaders }); if(res.status === 401 || res.status === 403) return fazerLogout(); if (!res.ok) return; const result = await res.json(); const itens = result.data; if (itens && itens.length > 0) { const msg = itens.length > 1 ? `${itens[0].produto} e mais ${itens.length - 1} estão com estoque baixo.` : `${itens[0].produto} está com estoque baixo (${itens[0].totalunidades} restantes).`; if (Notification.permission === 'granted') { new Notification('⚠️ Alerta de Estoque Baixo!', { body: msg, icon: 'https.://cdn-icons-png.flaticon.com/512/10099/10099719.png' }); } } } catch (e) { console.error('Erro ao verificar alertas:', e); } }
+        async function verificarAlertas(){ try { const res = await fetch(`${API_URL}/alertas/estoque-baixo`, { headers: authHeaders }); if(res.status === 401 || res.status === 403) return fazerLogout(); if (!res.ok) return; const result = await res.json(); const itens = result.data; if (itens && itens.length > 0) { const msg = itens.length > 1 ? `${itens[0].produto} e mais ${itens.length - 1} estão com estoque baixo.` : `${itens[0].produto} está com estoque baixo (${itens[0].totalunidades} restantes).`; if (Notification.permission === 'granted') { new Notification('⚠️ Alerta de Estoque Baixo!', { body: msg, icon: 'https://cdn-icons-png.flaticon.com/512/10099/10099719.png' }); } } } catch (e) { console.error('Erro ao verificar alertas:', e); } }
 
         // --- FUNÇÕES PRINCIPAIS ---
         async function carregarDados() {
@@ -387,11 +493,9 @@
             document.getElementById('infoPaginaEstoque').textContent = `Página ${paginacao.estoque.paginaAtual} de ${paginacao.estoque.totalPaginas}`;
             document.getElementById('btnEstoqueAnterior').disabled = paginacao.estoque.paginaAtual <= 1;
             document.getElementById('btnEstoqueProxima').disabled = paginacao.estoque.paginaAtual >= paginacao.estoque.totalPaginas;
-
             document.getElementById('infoPaginaSaida').textContent = `Página ${paginacao.saida.paginaAtual} de ${paginacao.saida.totalPaginas}`;
             document.getElementById('btnSaidaAnterior').disabled = paginacao.saida.paginaAtual <= 1;
             document.getElementById('btnSaidaProxima').disabled = paginacao.saida.paginaAtual >= paginacao.saida.totalPaginas;
-
             document.getElementById('infoPaginaFornecedores').textContent = `Página ${paginacao.fornecedores.paginaAtual} de ${paginacao.fornecedores.totalPaginas}`;
             document.getElementById('btnFornecedoresAnterior').disabled = paginacao.fornecedores.paginaAtual <= 1;
             document.getElementById('btnFornecedoresProxima').disabled = paginacao.fornecedores.paginaAtual >= paginacao.fornecedores.totalPaginas;
@@ -410,6 +514,7 @@
         function atualizarDashboard(stats){ document.getElementById('dashTotalEstoque').textContent = `${parseFloat(stats.totalItens || 0).toLocaleString()} un`; document.getElementById('dashValorEstoque').textContent = formatarMoeda(parseFloat(stats.valorTotal || 0)); document.getElementById('dashCriticos').textContent = stats.itensCriticos || 0; }
         async function renderizarGrafico(){ 
             const res = await fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders });
+            if(res.status === 401 || res.status === 403) return fazerLogout();
             const dadosCompletos = (await res.json()).data;
             const ctx = document.getElementById('graficoEstoque').getContext('2d'); 
             if (meuGrafico) { meuGrafico.destroy(); } 
@@ -442,13 +547,13 @@
             if (tipo === 'rolo') { lblPacotes.innerHTML = 'Qtd. de Rolos <span style="color: red;">*</span>'; lblCusto.innerHTML = 'Custo por Rolo (R$) <span style="color: red;">*</span>'; grpUnidades.style.display = 'none'; inptUnidades.value = 0; } 
             else { lblPacotes.innerHTML = 'Pacotes <span style="color: red;">*</span>'; lblCusto.innerHTML = 'Custo/Pacote (R$) <span style="color: red;">*</span>'; grpUnidades.style.display = 'flex'; } 
         }
-        async function adicionarEstoque(){ const selCat = document.getElementById('estoqueCategoriaId'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('estoqueUnidades').value) || 0); const item = { produto: document.getElementById('estoqueProduto').value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesAvulsas: unidades, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || !item.categoria_id || (!item.pacotes && !item.unidadesAvulsas && tipo !== 'rolo') || (tipo === 'rolo' && !item.pacotes) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function adicionarEstoque(){ const selCat = document.getElementById('estoqueCategoriaId'); if (!selCat.value) return mostrarMensagem('Por favor, selecione uma categoria.', 'error'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('estoqueUnidades').value) || 0); const item = { produto: document.getElementById('estoqueProduto').value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesAvulsas: unidades, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || !item.categoria_id || (!item.pacotes && !item.unidadesAvulsas && tipo !== 'rolo') || (tipo === 'rolo' && !item.pacotes) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         function editarEstoque(index){ const item = estoque[index]; document.getElementById('editId').value = item.id; document.getElementById('editProduto').value = item.produto; popularDropdownFornecedores('editFornecedorId', item.fornecedor_id); popularDropdownCategorias('editCategoriaId', item.categoria_id); setTimeout(() => ajustarCamposProduto('edit'), 100); document.getElementById('editPacotes').value = item.pacotes; document.getElementById('editUnidades').value = item.unidadesavulsas; document.getElementById('editCusto').value = item.custoporpacote; document.getElementById('editMinimo').value = item.estoqueminimo; document.getElementById('modalEdicao').style.display = 'block'; }
         async function salvarEdicao(){ const id = document.getElementById('editId').value; const selCat = document.getElementById('editCategoriaId'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('editPacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('editUnidades').value) || 0); const dados = { fornecedor_id: document.getElementById('editFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesavulsas: unidades, custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0, estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0 }; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(dados) }); if (!res.ok) throw new Error('Falha ao salvar as alterações.'); mostrarMensagem('Item atualizado com sucesso!', 'success'); fecharModal(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function excluirEstoque(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE', headers: authHeaders }); if (!res.ok) throw new Error('Falha ao deletar o item.'); mostrarMensagem('Item deletado com sucesso!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
         // --- FUNÇÕES DE SAÍDA ---
-        async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const res = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) }); const result = await res.json(); if (!res.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const item = estoque.find(i => i.id === pId); if (!item) return mostrarMensagem('Produto não encontrado.', 'error'); const cat = categorias.find(c => c.id === item.categoria_id); const tipo = cat ? cat.tipo_unidade : 'cartela'; let total; if(tipo === 'rolo') { total = parseInt(document.getElementById('saidaPacotes').value) || 0; } else { total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); } if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const res = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) }); const result = await res.json(); if (!res.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
         // --- FUNÇÕES DE FORNECEDORES ---
         async function adicionarFornecedor(){ const nomeIn = document.getElementById('fornecedorNome'); const nome = nomeIn.value.trim(); if (!nome) return mostrarMensagem('O nome do fornecedor é obrigatório.', 'error'); try { const res = await fetch('/api/fornecedores', { method: 'POST', headers: authHeaders, body: JSON.stringify({ nome }) }); if (!res.ok) throw new Error('Falha ao adicionar fornecedor'); nomeIn.value = ''; await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
@@ -472,8 +577,27 @@
         function finalizarProducao(id){ const item = emUso.find(i => i.id === id); if (!item) return; document.getElementById('finalizarId').value = item.id; document.getElementById('finalizarProduto').value = item.produto_nome; document.getElementById('finalizarDataFim').value = new Date().toISOString().split('T')[0]; const grpEtiquetas = document.getElementById('groupEtiquetasImpressas'); if (item.produto_nome.toLowerCase().includes('etiqueta')) { grpEtiquetas.style.display = 'block'; } else { grpEtiquetas.style.display = 'none'; } document.getElementById('modalFinalizarProducao').style.display = 'block'; }
         async function salvarFinalizacao(){ const id = document.getElementById('finalizarId').value; const data = { data_fim: document.getElementById('finalizarDataFim').value, etiquetas_impressas: parseInt(document.getElementById('finalizarEtiquetas').value) || null }; if (!data.data_fim) return mostrarMensagem('A data de finalização é obrigatória.', 'error'); try { const res = await fetch(`/api/producao/finalizar/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(data) }); if (!res.ok) throw new Error('Falha ao finalizar uso.'); mostrarMensagem('Uso de rolo finalizado!', 'success'); fecharModalProducao(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
+        // --- FUNÇÃO MINHA CONTA ---
+        async function alterarSenha() {
+            const senhaAtual = document.getElementById('senhaAtual').value;
+            const novaSenha = document.getElementById('novaSenha').value;
+            const confirmaNovaSenha = document.getElementById('confirmaNovaSenha').value;
+            if (!senhaAtual || !novaSenha || !confirmaNovaSenha) { return mostrarMensagem('Preencha todos os campos.', 'error'); }
+            if (novaSenha !== confirmaNovaSenha) { return mostrarMensagem('A nova senha e a confirmação não batem.', 'error'); }
+            try {
+                const res = await fetch('/api/usuarios/alterar-senha', { method: 'PUT', headers: authHeaders, body: JSON.stringify({ senhaAtual, novaSenha }) });
+                const result = await res.json();
+                if (!res.ok) { throw new Error(result.error || 'Erro ao alterar senha'); }
+                mostrarMensagem('Senha alterada com sucesso!', 'success');
+                document.getElementById('senhaAtual').value = '';
+                document.getElementById('novaSenha').value = '';
+                document.getElementById('confirmaNovaSenha').value = '';
+            } catch (e) { mostrarMensagem(e.message, 'error'); }
+        }
+
         // --- FUNÇÕES DE UI E AUXILIARES ---
-        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } }
+        function toggleMenu() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('mainContent').classList.toggle('active'); document.querySelector('.hamburger-btn').classList.toggle('active'); }
+        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } toggleMenu(); }
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
         function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.categoria_nome || '-'}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
@@ -532,6 +656,8 @@
         window.salvarFinalizacao = salvarFinalizacao;
         window.fecharModalProducao = fecharModalProducao;
         window.fazerLogout = fazerLogout;
+        window.alterarSenha = alterarSenha;
+        window.toggleMenu = toggleMenu;
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>

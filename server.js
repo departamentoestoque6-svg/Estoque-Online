@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA com Autenticação ATIVADA
+// server.js - VERSÃO 100% COMPLETA (com rota para alterar senha)
 
 require('dotenv').config();
 const express = require('express');
@@ -23,7 +23,7 @@ const createTables = async () => {
     CREATE TABLE IF NOT EXISTS categorias (
       id SERIAL PRIMARY KEY,
       nome TEXT NOT NULL UNIQUE,
-      tipo_unidade VARCHAR(50) NOT NULL DEFAULT 'cartela' -- 'cartela' ou 'rolo'
+      tipo_unidade VARCHAR(50) NOT NULL DEFAULT 'cartela'
     );
 
     CREATE TABLE IF NOT EXISTS estoque (
@@ -55,20 +55,16 @@ const createTables = async () => {
     );
   `;
   try {
-    // Tenta verificar se a coluna nova existe
     try {
         await pool.query('SELECT categoria_id FROM estoque LIMIT 1');
     } catch (e) {
-        if (e.code === '42703') { // Coluna não existe
+        if (e.code === '42703') { 
             console.log('Detectada estrutura antiga. Limpando e recriando tabelas...');
-            // Apaga tabelas na ordem correta de dependência
             await pool.query('DROP TABLE IF EXISTS saidas; DROP TABLE IF EXISTS uso_producao; DROP TABLE IF EXISTS estoque; DROP TABLE IF EXISTS categorias; DROP TABLE IF EXISTS fornecedores;');
-            // Recria tudo
-            await pool.query(queryText);
+            await pool.query(queryText); 
         }
     }
-    // Garante que tudo seja criado se não existir
-    await pool.query(queryText);
+    await pool.query(queryText); 
     console.log('Tabelas verificadas/criadas com sucesso.');
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
@@ -77,30 +73,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- MIDDLEWARE DE AUTENTICAÇÃO (O "GUARDA-COSTAS" - AGORA ATIVADO) ---
+// --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const protegerRota = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Formato: "Bearer TOKEN"
-
+    const token = authHeader && authHeader.split(' ')[1];
     if (token == null) {
         console.log('Acesso negado: Sem token.');
-        return res.sendStatus(401); // Não autorizado (sem token)
+        return res.sendStatus(401);
     }
-
-    // Use a variável de ambiente JWT_SECRET
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-        console.error("ERRO GRAVE: JWT_SECRET não está definido no ambiente.");
-        return res.status(500).json({ error: "Erro interno do servidor." });
-    }
-
+    const jwtSecret = process.env.JWT_SECRET || 'seu-segredo-super-secreto-aqui-12345';
     jwt.verify(token, jwtSecret, (err, user) => {
         if (err) {
             console.log('Acesso negado: Token inválido ou expirado.');
-            return res.sendStatus(403); // Proibido (token inválido ou expirado)
+            return res.sendStatus(403);
         }
         req.user = user;
-        next(); // O usuário é válido, pode prosseguir
+        next();
     });
 };
 
@@ -109,13 +97,10 @@ app.post('/api/usuarios/registrar', async (req, res) => {
     try {
         const { email, senha } = req.body;
         if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
-        
-        // Permite apenas 1 usuário para ser o administrador
         const userCountRes = await pool.query("SELECT COUNT(*) FROM usuarios");
         if (userCountRes.rows[0].count > 0) {
             return res.status(403).json({ error: 'Novos registros estão desativados.' });
         }
-
         const hashedPassword = await bcrypt.hash(senha, 10);
         const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
         res.status(201).json(newUser.rows[0]);
@@ -130,30 +115,49 @@ app.post('/api/usuarios/login', async (req, res) => {
     const user = userRes.rows[0];
     const senhaValida = await bcrypt.compare(senha, user.senha);
     if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-        console.error("ERRO GRAVE: JWT_SECRET não está definido no ambiente.");
-        return res.status(500).json({ error: "Erro interno do servidor." });
-    }
+    const jwtSecret = process.env.JWT_SECRET || 'seu-segredo-super-secreto-aqui-12345';
     const accessToken = jwt.sign({ id: user.id, email: user.email }, jwtSecret, { expiresIn: '1d' });
     res.json({ accessToken: accessToken });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ROTAS DA PÁGINA ---
-// Rota principal - Serve o login.html
+// --- ROTA PÚBLICA (PÁGINA) ---
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
-
-// Rota para o painel principal (o sistema de estoque)
 app.get('/app', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// --- ROTA PROTEGIDA (Alteração de Senha) ---
+app.put('/api/usuarios/alterar-senha', protegerRota, async (req, res) => {
+    const { senhaAtual, novaSenha } = req.body;
+    const userId = req.user.id; // Pegamos o ID do usuário logado (do token)
 
-// --- ROTAS DA API (AGORA PROTEGIDAS) ---
+    if (!senhaAtual || !novaSenha) {
+        return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
+    }
+    try {
+        const userRes = await pool.query('SELECT senha FROM usuarios WHERE id = $1', [userId]);
+        if (userRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuário não encontrado.' });
+        }
+        const hashSenhaAtual = userRes.rows[0].senha;
+        const senhaValida = await bcrypt.compare(senhaAtual, hashSenhaAtual);
+        if (!senhaValida) {
+            return res.status(401).json({ error: 'A senha atual está incorreta.' });
+        }
+        const hashNovaSenha = await bcrypt.hash(novaSenha, 10);
+        await pool.query('UPDATE usuarios SET senha = $1 WHERE id = $2', [hashNovaSenha, userId]);
+        res.status(200).json({ message: 'Senha alterada com sucesso!' });
+    } catch (err) {
+        console.error("Erro ao alterar senha:", err);
+        res.status(500).json({ error: 'Erro interno ao alterar a senha.' });
+    }
+});
+
+
+// --- ROTAS DA API (PROTEGIDAS) ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
   try {
     const totalItensQuery = 'SELECT SUM(e.totalunidades) AS total_itens FROM estoque e';
@@ -173,7 +177,6 @@ app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
     res.json(stats);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
   try {
     const query = 'SELECT produto, totalunidades, estoqueminimo FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0';
@@ -181,7 +184,6 @@ app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.get('/api/estoque', protegerRota, async (req, res) => {
   try {
     const pagina = parseInt(req.query.pagina || 1);
@@ -206,7 +208,6 @@ app.get('/api/estoque', protegerRota, async (req, res) => {
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.get('/api/saidas', protegerRota, async (req, res) => {
   try {
     const pagina = parseInt(req.query.pagina || 1);
@@ -222,7 +223,6 @@ app.get('/api/saidas', protegerRota, async (req, res) => {
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.post('/api/estoque', protegerRota, async (req, res) => {
     const { produto, fornecedor_id, categoria_id, pacotes, unidadesAvulsas, custoPorPacote, estoqueMinimo, ultimaEntrada } = req.body;
     try {
@@ -250,7 +250,6 @@ app.post('/api/estoque', protegerRota, async (req, res) => {
         res.status(201).json({ message: 'Estoque atualizado!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.put('/api/estoque/:id', protegerRota, async (req, res) => {
   try {
     const { id } = req.params;
@@ -265,7 +264,6 @@ app.put('/api/estoque/:id', protegerRota, async (req, res) => {
     res.status(200).json({ message: 'Item atualizado com sucesso!' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.delete('/api/estoque/:id', protegerRota, async (req, res) => {
   try {
     const { id } = req.params;
@@ -274,7 +272,6 @@ app.delete('/api/estoque/:id', protegerRota, async (req, res) => {
     res.status(200).json({ message: 'Item deletado com sucesso!' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.post('/api/saidas', protegerRota, async (req, res) => {
   const { data, produtoId, totalUnidades, destino } = req.body;
   const client = await pool.connect();
@@ -300,7 +297,6 @@ app.post('/api/saidas', protegerRota, async (req, res) => {
     client.release();
   }
 });
-
 app.get('/api/fornecedores', protegerRota, async (req, res) => {
   try {
     const pagina = parseInt(req.query.pagina || 1);
@@ -316,7 +312,6 @@ app.get('/api/fornecedores', protegerRota, async (req, res) => {
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.post('/api/fornecedores', protegerRota, async (req, res) => {
   try {
     const { nome } = req.body;
@@ -325,7 +320,6 @@ app.post('/api/fornecedores', protegerRota, async (req, res) => {
     res.status(201).json({ data: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.delete('/api/fornecedores/:id', protegerRota, async (req, res) => {
     try {
         const { id } = req.params;
@@ -333,14 +327,12 @@ app.delete('/api/fornecedores/:id', protegerRota, async (req, res) => {
         res.status(200).json({ message: 'Fornecedor deletado com sucesso!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.get('/api/categorias', protegerRota, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM categorias ORDER BY nome');
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.post('/api/categorias', protegerRota, async (req, res) => {
     try {
         const { nome, tipo_unidade } = req.body;
@@ -349,7 +341,6 @@ app.post('/api/categorias', protegerRota, async (req, res) => {
         res.status(201).json({ data: result.rows[0] });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
     try {
         const { id } = req.params;
@@ -361,7 +352,6 @@ app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
         res.status(200).json({ message: 'Categoria deletada com sucesso!' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
   try {
     const query = `
@@ -378,7 +368,6 @@ app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
     res.json({ data: result.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.get('/api/relatorios/saidas-por-periodo', protegerRota, async (req, res) => {
     const { de, ate } = req.query;
     if (!de || !ate) { return res.status(400).json({ error: 'As datas de início e fim são obrigatórias.' }); }
@@ -388,7 +377,6 @@ app.get('/api/relatorios/saidas-por-periodo', protegerRota, async (req, res) => 
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
     try {
         const query = `
@@ -417,7 +405,6 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         res.json({ data: relatorioProcessado });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     const { estoque_id, data_inicio } = req.body;
     const client = await pool.connect();
@@ -443,7 +430,6 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
         client.release();
     }
 });
-
 app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
     try {
         const query = `SELECT up.id, up.data_inicio, e.produto AS produto_nome FROM uso_producao up JOIN estoque e ON up.estoque_id = e.id WHERE up.status = 'Em Uso' ORDER BY up.data_inicio ASC`;
@@ -451,7 +437,6 @@ app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     const { id } = req.params;
     const { data_fim, etiquetas_impressas } = req.body;
