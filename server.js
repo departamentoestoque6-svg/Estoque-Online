@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA (com rota para alterar senha)
+// server.js - VERSÃO 100% COMPLETA com Preferências de Alerta
 
 require('dotenv').config();
 const express = require('express');
@@ -42,7 +42,12 @@ const createTables = async () => {
 
     CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
     
-    CREATE TABLE IF NOT EXISTS usuarios ( id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, senha TEXT NOT NULL );
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      senha TEXT NOT NULL,
+      receber_alertas BOOLEAN DEFAULT false
+    );
     
     CREATE TABLE IF NOT EXISTS uso_producao (
       id SERIAL PRIMARY KEY,
@@ -64,6 +69,17 @@ const createTables = async () => {
             await pool.query(queryText); 
         }
     }
+    
+    // Adiciona a nova coluna 'receber_alertas' se ela não existir
+    try {
+        await pool.query('SELECT receber_alertas FROM usuarios LIMIT 1');
+    } catch (e) {
+        if (e.code === '42703') {
+            console.log('Adicionando coluna "receber_alertas" na tabela usuarios.');
+            await pool.query('ALTER TABLE usuarios ADD COLUMN receber_alertas BOOLEAN DEFAULT false');
+        }
+    }
+
     await pool.query(queryText); 
     console.log('Tabelas verificadas/criadas com sucesso.');
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
@@ -97,10 +113,12 @@ app.post('/api/usuarios/registrar', async (req, res) => {
     try {
         const { email, senha } = req.body;
         if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
+        
         const userCountRes = await pool.query("SELECT COUNT(*) FROM usuarios");
         if (userCountRes.rows[0].count > 0) {
             return res.status(403).json({ error: 'Novos registros estão desativados.' });
         }
+
         const hashedPassword = await bcrypt.hash(senha, 10);
         const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
         res.status(201).json(newUser.rows[0]);
@@ -115,13 +133,14 @@ app.post('/api/usuarios/login', async (req, res) => {
     const user = userRes.rows[0];
     const senhaValida = await bcrypt.compare(senha, user.senha);
     if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
+
     const jwtSecret = process.env.JWT_SECRET || 'seu-segredo-super-secreto-aqui-12345';
     const accessToken = jwt.sign({ id: user.id, email: user.email }, jwtSecret, { expiresIn: '1d' });
     res.json({ accessToken: accessToken });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ROTA PÚBLICA (PÁGINA) ---
+// --- ROTAS DA PÁGINA ---
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -132,27 +151,43 @@ app.get('/app', (req, res) => {
 // --- ROTA PROTEGIDA (Alteração de Senha) ---
 app.put('/api/usuarios/alterar-senha', protegerRota, async (req, res) => {
     const { senhaAtual, novaSenha } = req.body;
-    const userId = req.user.id; // Pegamos o ID do usuário logado (do token)
-
-    if (!senhaAtual || !novaSenha) {
-        return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
-    }
+    const userId = req.user.id; 
+    if (!senhaAtual || !novaSenha) { return res.status(400).json({ error: 'Todos os campos são obrigatórios.' }); }
     try {
         const userRes = await pool.query('SELECT senha FROM usuarios WHERE id = $1', [userId]);
-        if (userRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Usuário não encontrado.' });
-        }
+        if (userRes.rows.length === 0) { return res.status(404).json({ error: 'Usuário não encontrado.' }); }
         const hashSenhaAtual = userRes.rows[0].senha;
         const senhaValida = await bcrypt.compare(senhaAtual, hashSenhaAtual);
-        if (!senhaValida) {
-            return res.status(401).json({ error: 'A senha atual está incorreta.' });
-        }
+        if (!senhaValida) { return res.status(401).json({ error: 'A senha atual está incorreta.' }); }
         const hashNovaSenha = await bcrypt.hash(novaSenha, 10);
         await pool.query('UPDATE usuarios SET senha = $1 WHERE id = $2', [hashNovaSenha, userId]);
         res.status(200).json({ message: 'Senha alterada com sucesso!' });
     } catch (err) {
         console.error("Erro ao alterar senha:", err);
         res.status(500).json({ error: 'Erro interno ao alterar a senha.' });
+    }
+});
+
+// --- NOVAS ROTAS DE PREFERÊNCIAS ---
+app.get('/api/usuarios/preferencias', protegerRota, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const result = await pool.query('SELECT receber_alertas FROM usuarios WHERE id = $1', [userId]);
+        if (result.rows.length === 0) { return res.status(404).json({ error: 'Usuário não encontrado.' }); }
+        res.json({ receber_alertas: result.rows[0].receber_alertas });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao buscar preferências.' });
+    }
+});
+
+app.put('/api/usuarios/preferencias', protegerRota, async (req, res) => {
+    const userId = req.user.id;
+    const { receber_alertas } = req.body;
+    try {
+        await pool.query('UPDATE usuarios SET receber_alertas = $1 WHERE id = $2', [receber_alertas, userId]);
+        res.status(200).json({ message: 'Preferências atualizadas com sucesso!' });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao salvar preferências.' });
     }
 });
 

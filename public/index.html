@@ -8,104 +8,30 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; min-height: 100vh; }
-        
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: -280px; /* Começa escondido */
-            width: 260px;
-            height: 100%;
-            background: #2c3e50;
-            color: white;
-            padding: 20px;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            transition: left 0.3s ease;
-            z-index: 1100;
-        }
-        .sidebar.active {
-            left: 0;
-        }
-        .sidebar h2 {
-            text-align: center;
-            font-weight: 300;
-            border-bottom: 1px solid #4a627a;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-        .tabs {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .tab {
-            display: block;
-            width: 100%;
-            padding: 15px 20px;
-            cursor: pointer;
-            background: transparent;
-            border: none;
-            font-size: 16px;
-            font-weight: 600;
-            color: #ecf0f1;
-            text-align: left;
-            transition: all 0.3s;
-            border-radius: 8px;
-        }
-        .tab:hover {
-            background: #34495e;
-        }
-        .tab.active {
-            background: #3498db;
-            color: white;
-        }
-
-        /* ESTA É A REGRA QUE ESTAVA FALTANDO */
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-
-        .main-content {
-            margin-left: 0;
-            padding: 20px;
-            transition: margin-left 0.3s ease;
-            width: 100%;
-        }
-        .sidebar.active + .main-content {
-            margin-left: 260px;
-        }
-        
+        .sidebar { position: fixed; top: 0; left: -280px; width: 260px; height: 100%; background: #2c3e50; color: white; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transition: left 0.3s ease; z-index: 1100; }
+        .sidebar.active { left: 0; }
+        .sidebar h2 { text-align: center; font-weight: 300; border-bottom: 1px solid #4a627a; padding-bottom: 15px; margin-bottom: 20px; }
+        .tabs { display: flex; flex-direction: column; gap: 10px; }
+        .tab { display: block; width: 100%; padding: 15px 20px; cursor: pointer; background: transparent; border: none; font-size: 16px; font-weight: 600; color: #ecf0f1; text-align: left; transition: all 0.3s; border-radius: 8px; }
+        .tab:hover { background: #34495e; }
+        .tab.active { background: #3498db; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .main-content { margin-left: 0; padding: 20px; transition: margin-left 0.3s ease; width: 100%; }
+        .sidebar.active + .main-content { margin-left: 260px; }
         .header { background: white; color: #2c3e50; padding: 15px 20px; text-align: center; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 15px; }
         .header h1 { font-size: 1.8em; font-weight: 400; margin: 0; }
         .save-status { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); background: #ecf0f1; color: #34495e; padding: 8px 15px; border-radius: 20px; font-size: 12px; }
         .btn-logout { position: absolute; top: 50%; right: 140px; transform: translateY(-50%); background: #e74c3c; color: white; padding: 8px 15px; border: none; border-radius: 20px; font-size: 12px; cursor: pointer; }
-        
-        .hamburger-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            font-size: 28px;
-            background: #34495e;
-            color: white;
-            border: none;
-            cursor: pointer;
-            padding: 5px 12px;
-            border-radius: 8px;
-            z-index: 1200;
-            transition: left 0.3s ease;
-        }
-        .sidebar.active ~ .hamburger-btn {
-            left: 280px;
-        }
-        
+        .hamburger-btn { position: fixed; top: 20px; left: 20px; font-size: 28px; background: #34495e; color: white; border: none; cursor: pointer; padding: 5px 12px; border-radius: 8px; z-index: 1200; transition: left 0.3s ease; }
+        .sidebar.active ~ .hamburger-btn { left: 280px; }
         .container { max-width: 1900px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; margin-top: 80px; }
         .content { padding: 30px; }
-        
         .section, .chart-container { background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid #3498db; }
         .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
         .form-group { display: flex; flex-direction: column; }
+        .form-group-check { flex-direction: row; align-items: center; }
+        .form-group-check input { width: auto; margin-right: 10px; }
         label { font-weight: 600; color: #2c3e50; margin-bottom: 5px; font-size: 14px; }
         input, select { padding: 10px; border: 2px solid #e9ecef; border-radius: 6px; font-size: 14px; transition: border-color 0.3s; }
         input:focus, select:focus { outline: none; border-color: #3498db; }
@@ -357,11 +283,13 @@
                 <div id="aba-conta" class="tab-content">
                     <div class="section">
                         <h3>Alterar Senha</h3>
-                        <div class="form-row">
+                        <div class="form-row" style="max-width: 500px;">
                             <div class="form-group">
                                 <label for="senhaAtual">Senha Atual <span style="color: red;">*</span></label>
                                 <input type="password" id="senhaAtual">
                             </div>
+                        </div>
+                        <div class="form-row" style="max-width: 500px;">
                             <div class="form-group">
                                 <label for="novaSenha">Nova Senha <span style="color: red;">*</span></label>
                                 <input type="password" id="novaSenha">
@@ -372,6 +300,13 @@
                             </div>
                         </div>
                         <button class="btn btn-success" onclick="alterarSenha()">Salvar Nova Senha</button>
+                    </div>
+                    <div class="section">
+                        <h3>Preferências de Notificação</h3>
+                        <div class="form-group-check">
+                            <input type="checkbox" id="checkAlertasEmail" onchange="salvarPreferencias()">
+                            <label for="checkAlertasEmail">Desejo receber alertas de estoque crítico por email.</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -446,36 +381,37 @@
         async function carregarDados() {
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
-                const [estRes, saiRes, staRes, fornRes, usoRes, catRes] = await Promise.all([
+                const [estRes, saiRes, staRes, fornRes, usoRes, catRes, prefRes] = await Promise.all([
                     fetch(`${API_URL}/estoque?pagina=${paginacao.estoque.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/saidas?pagina=${paginacao.saida.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/dashboard/stats`, { headers: authHeaders }), 
                     fetch(`${API_URL}/fornecedores?pagina=${paginacao.fornecedores.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/producao/em-uso`, { headers: authHeaders }),
-                    fetch(`${API_URL}/categorias`, { headers: authHeaders })
+                    fetch(`${API_URL}/categorias`, { headers: authHeaders }),
+                    fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders })
                 ]);
                 
                 if (estRes.status === 401 || estRes.status === 403) { return fazerLogout(); }
-                if (!estRes.ok || !saiRes.ok || !staRes.ok || !fornRes.ok || !usoRes.ok || !catRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+                if (!estRes.ok || !saiRes.ok || !staRes.ok || !fornRes.ok || !usoRes.ok || !catRes.ok || !prefRes.ok) throw new Error('Falha ao buscar dados do servidor.');
                 
                 const estoqueData = await estRes.json();
                 const saidasData = await saiRes.json();
                 const statsData = await staRes.json();
                 const fornecedoresData = await fornRes.json();
                 const emUsoData = await usoRes.json();
+                const prefData = await prefRes.json();
                 
                 estoque = estoqueData.data;
                 paginacao.estoque = estoqueData.meta;
-                
                 saidas = saidasData.data;
                 paginacao.saida = saidasData.meta;
-
                 fornecedores = fornecedoresData.data;
                 paginacao.fornecedores = fornecedoresData.meta;
-
                 emUso = emUsoData.data;
                 categorias = (await catRes.json()).data;
                 
+                document.getElementById('checkAlertasEmail').checked = prefData.receber_alertas;
+
                 document.getElementById('saveStatus').textContent = 'Pronto';
                 atualizarDashboard(statsData);
                 atualizarTodaUI();
@@ -561,7 +497,7 @@
         async function excluirEstoque(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE', headers: authHeaders }); if (!res.ok) throw new Error('Falha ao deletar o item.'); mostrarMensagem('Item deletado com sucesso!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
         // --- FUNÇÕES DE SAÍDA ---
-        async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const item = estoque.find(i => i.id === pId); if (!item) return mostrarMensagem('Produto não encontrado.', 'error'); const cat = categorias.find(c => c.id === item.categoria_id); const tipo = cat ? cat.tipo_unidade : 'cartela'; let total; if(tipo === 'rolo') { total = parseInt(document.getElementById('saidaPacotes').value) || 0; } else { total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); } if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const res = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) }); const result = await res.json(); if (!res.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const itemEstoque = estoque.find(i => i.id === pId); if (!itemEstoque) return mostrarMensagem('Produto não encontrado.', 'error'); const cat = categorias.find(c => c.id === itemEstoque.categoria_id); const tipo = cat ? cat.tipo_unidade : 'cartela'; let total; if(tipo === 'rolo') { total = parseInt(document.getElementById('saidaPacotes').value) || 0; } else { total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); } if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const res = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) }); const result = await res.json(); if (!res.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
         // --- FUNÇÕES DE FORNECEDORES ---
         async function adicionarFornecedor(){ const nomeIn = document.getElementById('fornecedorNome'); const nome = nomeIn.value.trim(); if (!nome) return mostrarMensagem('O nome do fornecedor é obrigatório.', 'error'); try { const res = await fetch('/api/fornecedores', { method: 'POST', headers: authHeaders, body: JSON.stringify({ nome }) }); if (!res.ok) throw new Error('Falha ao adicionar fornecedor'); nomeIn.value = ''; await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
@@ -602,10 +538,24 @@
                 document.getElementById('confirmaNovaSenha').value = '';
             } catch (e) { mostrarMensagem(e.message, 'error'); }
         }
+        async function salvarPreferencias() {
+            const check = document.getElementById('checkAlertasEmail').checked;
+            try {
+                const res = await fetch('/api/usuarios/preferencias', {
+                    method: 'PUT',
+                    headers: authHeaders,
+                    body: JSON.stringify({ receber_alertas: check })
+                });
+                if (!res.ok) throw new Error('Falha ao salvar preferência.');
+                mostrarMensagem('Preferências de notificação salvas!', 'success');
+            } catch (e) {
+                mostrarMensagem(e.message, 'error');
+            }
+        }
 
         // --- FUNÇÕES DE UI E AUXILIARES ---
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('mainContent').classList.toggle('active'); document.querySelector('.hamburger-btn').classList.toggle('active'); }
-        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } if (window.innerWidth < 768) { toggleMenu(); } }
+        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else if (aba !== 'conta') { atualizarTodaUI(); } if (window.innerWidth < 768) { toggleMenu(); } }
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
         function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.categoria_nome || '-'}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
@@ -666,6 +616,7 @@
         window.fazerLogout = fazerLogout;
         window.alterarSenha = alterarSenha;
         window.toggleMenu = toggleMenu;
+        window.salvarPreferencias = salvarPreferencias;
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>
