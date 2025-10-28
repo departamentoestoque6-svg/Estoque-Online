@@ -8,101 +8,25 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; min-height: 100vh; }
-        
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: -280px; /* Começa escondido */
-            width: 260px;
-            height: 100%;
-            background: #2c3e50;
-            color: white;
-            padding: 20px;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            transition: left 0.3s ease;
-            z-index: 1100;
-            overflow-y: auto;
-        }
-        .sidebar.active {
-            left: 0;
-        }
-        .sidebar h2 {
-            text-align: center;
-            font-weight: 300;
-            border-bottom: 1px solid #4a627a;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-        .tabs {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .tab {
-            display: block;
-            width: 100%;
-            padding: 15px 20px;
-            cursor: pointer;
-            background: transparent;
-            border: none;
-            font-size: 16px;
-            font-weight: 600;
-            color: #ecf0f1;
-            text-align: left;
-            transition: all 0.3s;
-            border-radius: 8px;
-        }
-        .tab:hover {
-            background: #34495e;
-        }
-        .tab.active {
-            background: #3498db;
-            color: white;
-        }
-
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-
-        .main-content {
-            margin-left: 0;
-            padding: 20px;
-            transition: margin-left 0.3s ease;
-            width: 100%;
-        }
-        .sidebar.active + .main-content {
-            margin-left: 260px;
-        }
-        
+        .sidebar { position: fixed; top: 0; left: -280px; width: 260px; height: 100%; background: #2c3e50; color: white; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transition: left 0.3s ease; z-index: 1100; overflow-y: auto; }
+        .sidebar.active { left: 0; }
+        .sidebar h2 { text-align: center; font-weight: 300; border-bottom: 1px solid #4a627a; padding-bottom: 15px; margin-bottom: 20px; }
+        .tabs { display: flex; flex-direction: column; gap: 10px; }
+        .tab { display: block; width: 100%; padding: 15px 20px; cursor: pointer; background: transparent; border: none; font-size: 16px; font-weight: 600; color: #ecf0f1; text-align: left; transition: all 0.3s; border-radius: 8px; }
+        .tab:hover { background: #34495e; }
+        .tab.active { background: #3498db; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .main-content { margin-left: 0; padding: 20px; transition: margin-left 0.3s ease; width: 100%; }
+        .sidebar.active + .main-content { margin-left: 260px; }
         .header { background: white; color: #2c3e50; padding: 15px 20px; text-align: center; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 15px; }
         .header h1 { font-size: 1.8em; font-weight: 400; margin: 0; }
         .save-status { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); background: #ecf0f1; color: #34495e; padding: 8px 15px; border-radius: 20px; font-size: 12px; }
         .btn-logout { position: absolute; top: 50%; right: 140px; transform: translateY(-50%); background: #e74c3c; color: white; padding: 8px 15px; border: none; border-radius: 20px; font-size: 12px; cursor: pointer; }
-        
-        .hamburger-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            font-size: 28px;
-            background: #34495e;
-            color: white;
-            border: none;
-            cursor: pointer;
-            padding: 5px 12px;
-            border-radius: 8px;
-            z-index: 1200;
-            transition: left 0.3s ease;
-        }
-        .sidebar.active ~ .hamburger-btn {
-            left: 280px;
-        }
-        
+        .hamburger-btn { position: fixed; top: 20px; left: 20px; font-size: 28px; background: #34495e; color: white; border: none; cursor: pointer; padding: 5px 12px; border-radius: 8px; z-index: 1200; transition: left 0.3s ease; }
+        .sidebar.active ~ .hamburger-btn { left: 280px; }
         .container { max-width: 1900px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; margin-top: 80px; }
         .content { padding: 30px; }
-        
         .section, .chart-container { background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid #3498db; }
         .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
         .form-group { display: flex; flex-direction: column; }
@@ -383,6 +307,9 @@
                             <input type="checkbox" id="checkAlertasEmail" onchange="salvarPreferencias()">
                             <label for="checkAlertasEmail">Desejo receber alertas de estoque crítico por email.</label>
                         </div>
+                        <br>
+                        <p>Para testar o envio de email, clique no botão abaixo. (Requer itens em estoque crítico).</p>
+                        <button class="btn" onclick="testarAlertas()">Testar Alerta Agora</button>
                     </div>
                 </div>
             </div>
@@ -464,7 +391,7 @@
                     fetch(`${API_URL}/fornecedores?pagina=${paginacao.fornecedores.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/producao/em-uso`, { headers: authHeaders }),
                     fetch(`${API_URL}/categorias`, { headers: authHeaders }),
-                    fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders }) // <-- NOVO
+                    fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders })
                 ]);
                 
                 if (estRes.status === 401 || estRes.status === 403) { return fazerLogout(); }
@@ -475,7 +402,7 @@
                 const statsData = await staRes.json();
                 const fornecedoresData = await fornRes.json();
                 const emUsoData = await usoRes.json();
-                const prefData = await prefRes.json(); // <-- NOVO
+                const prefData = await prefRes.json();
                 
                 estoque = estoqueData.data;
                 paginacao.estoque = estoqueData.meta;
@@ -486,7 +413,7 @@
                 emUso = emUsoData.data;
                 categorias = (await catRes.json()).data;
                 
-                document.getElementById('checkAlertasEmail').checked = prefData.receber_alertas; // <-- NOVO
+                document.getElementById('checkAlertasEmail').checked = prefData.receber_alertas;
 
                 document.getElementById('saveStatus').textContent = 'Pronto';
                 atualizarDashboard(statsData);
@@ -504,6 +431,7 @@
             renderizarFornecedores();
             popularDropdownFornecedores('estoqueFornecedorId');
             popularDropdownCategorias('estoqueCategoriaId');
+            popularDropdownCategorias('editCategoriaId');
             popularDropdownProducao();
             renderizarProducaoEmUso();
             renderizarCategorias();
@@ -525,7 +453,9 @@
                 const novaPagina = paginacao[tipo].paginaAtual + direcao;
                 if (novaPagina > 0 && novaPagina <= paginacao[tipo].totalPaginas) {
                     paginacao[tipo].paginaAtual = novaPagina;
-                    await carregarDados();
+                    if(tipo === 'estoque') await carregarDados(); // Recarrega tudo
+                    else if(tipo === 'saida') await carregarDados(); // Recarrega tudo
+                    else if(tipo === 'fornecedores') await carregarDados(); // Recarrega tudo
                 }
             }
         }
@@ -642,6 +572,17 @@
                 mostrarMensagem(e.message, 'error');
             }
         }
+        async function testarAlertas() {
+            mostrarMensagem('Verificando alertas e enviando email de teste...', 'success');
+            try {
+                const res = await fetch('/api/estoque/verificar-alertas', { method: 'POST', headers: authHeaders });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Falha ao verificar');
+                mostrarMensagem(result.message, 'success');
+            } catch (e) {
+                mostrarMensagem(e.message, 'error');
+            }
+        }
 
         // --- FUNÇÕES DE UI E AUXILIARES ---
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('mainContent').classList.toggle('active'); document.querySelector('.hamburger-btn').classList.toggle('active'); }
@@ -715,6 +656,7 @@
         window.alterarSenha = alterarSenha;
         window.toggleMenu = toggleMenu;
         window.salvarPreferencias = salvarPreferencias;
+        window.testarAlertas = testarAlertas;
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>

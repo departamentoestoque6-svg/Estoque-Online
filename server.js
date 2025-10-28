@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA (com NodeMailer/Gmail)
+// server.js - VERSÃO 100% COMPLETA (com Rota Cron Secreta)
 
 require('dotenv').config();
 const express = require('express');
@@ -7,7 +7,7 @@ const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer'); // <-- NOVO
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,10 +18,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Configura o NodeMailer com o Gmail
 const emailRemetente = process.env.EMAIL_REMETENTE;
 const emailSenha = process.env.EMAIL_SENHA;
-
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -192,11 +190,11 @@ app.put('/api/usuarios/preferencias', protegerRota, async (req, res) => {
     }
 });
 
-// --- FUNÇÃO E ROTA DE TESTE DE EMAIL ---
+// --- FUNÇÃO E ROTA DE VERIFICAÇÃO DE ALERTAS ---
 async function enviarEmailAlerta(para, assunto, textoHtml) {
     if (!emailRemetente || !emailSenha) {
         console.error("ERRO: EMAIL_REMETENTE ou EMAIL_SENHA não definidos. Email não pode ser enviado.");
-        return;
+        return false;
     }
     const msg = {
         from: `"Sistema de Estoque" <${emailRemetente}>`,
@@ -207,39 +205,85 @@ async function enviarEmailAlerta(para, assunto, textoHtml) {
     try {
         await transporter.sendMail(msg);
         console.log(`Email enviado com sucesso para ${para}`);
+        return true;
     } catch (error) {
         console.error('Erro ao enviar email pelo NodeMailer/Gmail:', error);
+        return false;
     }
 }
 
-app.post('/api/estoque/verificar-alertas', protegerRota, async (req, res) => {
+async function verificarEEnviarAlertas() {
     try {
+        console.log('Iniciando verificação de estoque crítico...');
         const itensRes = await pool.query('SELECT produto, totalunidades FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0');
         const itensCriticos = itensRes.rows;
+
         if (itensCriticos.length === 0) {
-            return res.status(200).json({ message: 'Nenhum item crítico encontrado. Emails não enviados.' });
+            console.log('Nenhum item crítico encontrado.');
+            return { message: 'Nenhum item crítico encontrado. Emails não enviados.' };
         }
+
         let listaHtml = '<ul>';
         itensCriticos.forEach(item => {
             listaHtml += `<li><b>${item.produto}:</b> ${item.totalunidades} unidades restantes.</li>`;
         });
         listaHtml += '</ul>';
         const corpoHtml = `<h2>Alerta de Estoque Crítico</h2><p>Os seguintes itens do seu estoque estão acabando:</p>${listaHtml}<p>Por favor, acesse o sistema para tomar uma providência.</p>`;
+
         const usuariosRes = await pool.query('SELECT email FROM usuarios WHERE receber_alertas = true');
         const destinatarios = usuariosRes.rows.map(u => u.email);
+
         if (destinatarios.length === 0) {
-            return res.status(200).json({ message: 'Itens críticos encontrados, mas nenhum usuário optou por receber alertas.' });
+            console.log('Itens críticos encontrados, mas nenhum usuário optou por receber alertas.');
+            return { message: 'Itens críticos encontrados, mas nenhum usuário optou por receber alertas.' };
         }
-        await enviarEmailAlerta(destinatarios.join(', '), 'Alerta de Estoque Crítico', corpoHtml);
-        res.status(200).json({ message: `Alertas de estoque crítico enviados para ${destinatarios.length} usuário(s).` });
+
+        const enviado = await enviarEmailAlerta(destinatarios.join(', '), 'Alerta de Estoque Crítico', corpoHtml);
+        if (enviado) {
+            return { message: `Alertas de estoque crítico enviados para ${destinatarios.length} usuário(s).` };
+        } else {
+            throw new Error("Falha no transporte do email.");
+        }
     } catch (err) {
         console.error("Erro na verificação de alertas:", err);
+        throw err;
+    }
+}
+
+// Rota de teste manual (protegida)
+app.post('/api/estoque/verificar-alertas', protegerRota, async (req, res) => {
+    try {
+        const resultado = await verificarEEnviarAlertas();
+        res.status(200).json(resultado);
+    } catch (err) {
         res.status(500).json({ error: 'Erro ao verificar alertas.' });
     }
 });
 
+// NOVA ROTA PÚBLICA PARA O CRON JOB
+app.get('/api/cron/verificar-alertas/:secret', async (req, res) => {
+    const { secret } = req.params;
+    const cronSecret = process.env.CRON_SECRET;
 
-// --- ROTAS DA API (PROTEGIDAS) ---
+    if (!cronSecret) {
+        console.log("CRON JOB falhou: CRON_SECRET não está definido no ambiente.");
+        return res.status(500).json({ error: 'Serviço de cron não configurado.' });
+    }
+    if (secret !== cronSecret) {
+        console.log("CRON JOB falhou: Segredo inválido.");
+        return res.status(401).json({ error: 'Não autorizado.' });
+    }
+
+    try {
+        const resultado = await verificarEEnviarAlertas();
+        res.status(200).json(resultado);
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao executar verificação de alertas.' });
+    }
+});
+
+
+// --- OUTRAS ROTAS DA API (PROTEGIDAS) ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
   try {
     const totalItensQuery = 'SELECT SUM(e.totalunidades) AS total_itens FROM estoque e';
