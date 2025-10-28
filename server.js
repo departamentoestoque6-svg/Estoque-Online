@@ -1,10 +1,12 @@
-// server.js - VERSÃO 100% COMPLETA com Paginação
+// server.js - VERSÃO 100% COMPLETA com Autenticação ATIVADA
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -53,16 +55,20 @@ const createTables = async () => {
     );
   `;
   try {
+    // Tenta verificar se a coluna nova existe
     try {
         await pool.query('SELECT categoria_id FROM estoque LIMIT 1');
     } catch (e) {
-        if (e.code === '42703') { 
+        if (e.code === '42703') { // Coluna não existe
             console.log('Detectada estrutura antiga. Limpando e recriando tabelas...');
+            // Apaga tabelas na ordem correta de dependência
             await pool.query('DROP TABLE IF EXISTS saidas; DROP TABLE IF EXISTS uso_producao; DROP TABLE IF EXISTS estoque; DROP TABLE IF EXISTS categorias; DROP TABLE IF EXISTS fornecedores;');
-            await pool.query(queryText); 
+            // Recria tudo
+            await pool.query(queryText);
         }
     }
-    await pool.query(queryText); 
+    // Garante que tudo seja criado se não existir
+    await pool.query(queryText);
     console.log('Tabelas verificadas/criadas com sucesso.');
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
@@ -71,12 +77,83 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- MIDDLEWARE DE AUTENTICAÇÃO ---
+// --- MIDDLEWARE DE AUTENTICAÇÃO (O "GUARDA-COSTAS" - AGORA ATIVADO) ---
 const protegerRota = (req, res, next) => {
-    next(); // Proteção desativada
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Formato: "Bearer TOKEN"
+
+    if (token == null) {
+        console.log('Acesso negado: Sem token.');
+        return res.sendStatus(401); // Não autorizado (sem token)
+    }
+
+    // Use a variável de ambiente JWT_SECRET
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+        console.error("ERRO GRAVE: JWT_SECRET não está definido no ambiente.");
+        return res.status(500).json({ error: "Erro interno do servidor." });
+    }
+
+    jwt.verify(token, jwtSecret, (err, user) => {
+        if (err) {
+            console.log('Acesso negado: Token inválido ou expirado.');
+            return res.sendStatus(403); // Proibido (token inválido ou expirado)
+        }
+        req.user = user;
+        next(); // O usuário é válido, pode prosseguir
+    });
 };
 
-// --- ROTAS DA API ---
+// --- ROTAS PÚBLICAS (Login/Registro) ---
+app.post('/api/usuarios/registrar', async (req, res) => {
+    try {
+        const { email, senha } = req.body;
+        if (!email || !senha) { return res.status(400).json({ error: 'Email e senha são obrigatórios.' }); }
+        
+        // Permite apenas 1 usuário para ser o administrador
+        const userCountRes = await pool.query("SELECT COUNT(*) FROM usuarios");
+        if (userCountRes.rows[0].count > 0) {
+            return res.status(403).json({ error: 'Novos registros estão desativados.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(senha, 10);
+        const newUser = await pool.query("INSERT INTO usuarios (email, senha) VALUES ($1, $2) RETURNING id, email", [email, hashedPassword]);
+        res.status(201).json(newUser.rows[0]);
+    } catch (err) { res.status(500).json({ error: 'Email já pode estar em uso ou outro erro ocorreu.' }); }
+});
+
+app.post('/api/usuarios/login', async (req, res) => {
+  try {
+    const { email, senha } = req.body;
+    const userRes = await pool.query("SELECT * FROM usuarios WHERE email = $1", [email]);
+    if (userRes.rows.length === 0) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
+    const user = userRes.rows[0];
+    const senhaValida = await bcrypt.compare(senha, user.senha);
+    if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+        console.error("ERRO GRAVE: JWT_SECRET não está definido no ambiente.");
+        return res.status(500).json({ error: "Erro interno do servidor." });
+    }
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, jwtSecret, { expiresIn: '1d' });
+    res.json({ accessToken: accessToken });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ROTAS DA PÁGINA ---
+// Rota principal - Serve o login.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Rota para o painel principal (o sistema de estoque)
+app.get('/app', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+
+// --- ROTAS DA API (AGORA PROTEGIDAS) ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
   try {
     const totalItensQuery = 'SELECT SUM(e.totalunidades) AS total_itens FROM estoque e';
@@ -105,14 +182,11 @@ app.get('/api/alertas/estoque-baixo', protegerRota, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ROTA DE ESTOQUE ATUALIZADA COM PAGINAÇÃO
 app.get('/api/estoque', protegerRota, async (req, res) => {
   try {
     const pagina = parseInt(req.query.pagina || 1);
     const limite = 20; // 20 itens por página
     const offset = (pagina - 1) * limite;
-
-    // 1. Consulta para pegar os dados da página
     const dadosQuery = `
       SELECT e.*, f.nome AS fornecedor_nome, c.nome AS categoria_nome, c.tipo_unidade
       FROM estoque e 
@@ -122,44 +196,29 @@ app.get('/api/estoque', protegerRota, async (req, res) => {
       LIMIT $1 OFFSET $2
     `;
     const dadosRes = await pool.query(dadosQuery, [limite, offset]);
-
-    // 2. Consulta para contar o total de itens
     const totalQuery = 'SELECT COUNT(*) AS total_itens FROM estoque';
     const totalRes = await pool.query(totalQuery);
     const totalItens = parseInt(totalRes.rows[0].total_itens);
     const totalPaginas = Math.ceil(totalItens / limite);
-
     res.json({ 
         data: dadosRes.rows,
-        meta: {
-            paginaAtual: pagina,
-            totalPaginas: totalPaginas,
-            totalItens: totalItens
-        }
+        meta: { paginaAtual: pagina, totalPaginas: totalPaginas, totalItens: totalItens }
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ROTA DE SAÍDAS ATUALIZADA COM PAGINAÇÃO
 app.get('/api/saidas', protegerRota, async (req, res) => {
   try {
     const pagina = parseInt(req.query.pagina || 1);
-    const limite = 20; // 20 itens por página
+    const limite = 20;
     const offset = (pagina - 1) * limite;
-    
     const dadosRes = await pool.query('SELECT * FROM saidas ORDER BY data DESC LIMIT $1 OFFSET $2', [limite, offset]);
-    
     const totalRes = await pool.query('SELECT COUNT(*) AS total_itens FROM saidas');
     const totalItens = parseInt(totalRes.rows[0].total_itens);
     const totalPaginas = Math.ceil(totalItens / limite);
-
     res.json({ 
         data: dadosRes.rows,
-        meta: {
-            paginaAtual: pagina,
-            totalPaginas: totalPaginas,
-            totalItens: totalItens
-        }
+        meta: { paginaAtual: pagina, totalPaginas: totalPaginas, totalItens: totalItens }
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
