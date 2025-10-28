@@ -59,6 +59,14 @@
             color: white;
         }
 
+        /* ESTA É A REGRA QUE ESTAVA FALTANDO */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
         .main-content {
             margin-left: 0;
             padding: 20px;
@@ -408,10 +416,10 @@
         </div>
     </div>
     <script>
-        // --- AUTENTICAÇÃO (NOVO) ---
+        // --- AUTENTICAÇÃO ---
         const token = localStorage.getItem('authToken');
         if (!token) {
-            window.location.href = '/login.html'; // Se não tem token, expulsa
+            window.location.href = '/login.html';
         }
         const authHeaders = {
             'Content-Type': 'application/json',
@@ -597,7 +605,7 @@
 
         // --- FUNÇÕES DE UI E AUXILIARES ---
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('mainContent').classList.toggle('active'); document.querySelector('.hamburger-btn').classList.toggle('active'); }
-        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } toggleMenu(); }
+        function trocarAba(aba){ document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active')); document.querySelector(`.tab[onclick*="'${aba}'"]`).classList.add('active'); document.getElementById(`aba-${aba}`).classList.add('active'); if (aba === 'relatorios') { carregarRelatorios(); } else { atualizarTodaUI(); } if (window.innerWidth < 768) { toggleMenu(); } }
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
         function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${estoque.indexOf(item)})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.categoria_nome || '-'}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
