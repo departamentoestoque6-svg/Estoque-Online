@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA (com SendGrid)
+// server.js - VERSÃO 100% COMPLETA (com Edição de Categoria/Fornecedor)
 
 require('dotenv').config();
 const express = require('express');
@@ -7,7 +7,7 @@ const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const sgMail = require('@sendgrid/mail'); // <-- CORRETO
+const nodemailer = require('nodemailer'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,9 +18,21 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Configura o SendGrid
-sgMail.setApiKey(process.env.SENDGRID_API_KEY); // <-- CORRETO
-const emailRemetente = process.env.EMAIL_REMETENTE; // <-- CORRETO
+const emailRemetente = process.env.EMAIL_REMETENTE;
+const emailSenha = process.env.EMAIL_SENHA;
+
+let transporter;
+if (emailRemetente && emailSenha) {
+    transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: emailRemetente,
+            pass: emailSenha 
+        }
+    });
+} else {
+    console.warn("Variáveis de email (EMAIL_REMETENTE, EMAIL_SENHA) não definidas. O envio de email está desativado.");
+}
 
 // --- CRIAÇÃO DE TABELAS ---
 const createTables = async () => {
@@ -186,63 +198,53 @@ app.put('/api/usuarios/preferencias', protegerRota, async (req, res) => {
 
 // --- FUNÇÃO E ROTA DE VERIFICAÇÃO DE ALERTAS ---
 async function enviarEmailAlerta(para, assunto, textoHtml) {
-    if (!emailRemetente || !process.env.SENDGRID_API_KEY) {
-        console.error("ERRO: SENDGRID_API_KEY ou EMAIL_REMETENTE não definidos. Email não pode ser enviado.");
+    if (!transporter || !emailRemetente) {
+        console.error("ERRO: O serviço de email (NodeMailer) não está configurado. Verifique as variáveis de ambiente EMAIL_REMETENTE e EMAIL_SENHA.");
         throw new Error("Serviço de email não configurado.");
     }
     const msg = {
-        to: para, // Pode ser um array de emails
-        from: emailRemetente, // O email verificado no SendGrid
+        from: `"Sistema de Estoque" <${emailRemetente}>`,
+        to: para,
         subject: assunto,
         html: textoHtml,
     };
     try {
-        await sgMail.send(msg);
+        await transporter.sendMail(msg);
         console.log(`Email enviado com sucesso para ${para}`);
         return true;
     } catch (error) {
-        console.error('Erro ao enviar email pelo SendGrid:', error);
-        if (error.response) {
-            console.error(error.response.body);
-        }
+        console.error('Erro ao enviar email pelo NodeMailer/Gmail:', error);
         throw error;
     }
 }
-
 async function verificarEEnviarAlertas() {
     try {
         console.log('Iniciando verificação de estoque crítico...');
         const itensRes = await pool.query('SELECT produto, totalunidades FROM estoque WHERE totalunidades <= estoqueminimo AND estoqueminimo > 0');
         const itensCriticos = itensRes.rows;
-
         if (itensCriticos.length === 0) {
             console.log('Nenhum item crítico encontrado.');
             return { message: 'Nenhum item crítico encontrado. Emails não enviados.' };
         }
-
         let listaHtml = '<ul>';
         itensCriticos.forEach(item => {
             listaHtml += `<li><b>${item.produto}:</b> ${item.totalunidades} unidades restantes.</li>`;
         });
         listaHtml += '</ul>';
         const corpoHtml = `<h2>Alerta de Estoque Crítico</h2><p>Os seguintes itens do seu estoque estão acabando:</p>${listaHtml}<p>Por favor, acesse o sistema para tomar uma providência.</p>`;
-
         const usuariosRes = await pool.query('SELECT email FROM usuarios WHERE receber_alertas = true');
         const destinatarios = usuariosRes.rows.map(u => u.email);
-
         if (destinatarios.length === 0) {
             console.log('Itens críticos encontrados, mas nenhum usuário optou por receber alertas.');
             return { message: 'Itens críticos encontrados, mas nenhum usuário optou por receber alertas.' };
         }
-
-        await enviarEmailAlerta(destinatarios, 'Alerta de Estoque Crítico', corpoHtml);
+        await enviarEmailAlerta(destinatarios.join(', '), 'Alerta de Estoque Crítico', corpoHtml);
         return { message: `Alertas de estoque crítico enviados para ${destinatarios.length} usuário(s).` };
     } catch (err) {
         console.error("Erro na verificação de alertas:", err);
         throw err;
     }
 }
-
 app.post('/api/estoque/verificar-alertas', protegerRota, async (req, res) => {
     try {
         const resultado = await verificarEEnviarAlertas();
@@ -251,7 +253,6 @@ app.post('/api/estoque/verificar-alertas', protegerRota, async (req, res) => {
         res.status(500).json({ error: 'Erro ao verificar alertas.' });
     }
 });
-
 app.get('/api/cron/verificar-alertas/:secret', async (req, res) => {
     const { secret } = req.params;
     const cronSecret = process.env.CRON_SECRET;
@@ -272,7 +273,7 @@ app.get('/api/cron/verificar-alertas/:secret', async (req, res) => {
 });
 
 
-// --- OUTRAS ROTAS DA API (PROTEGIDAS) ---
+// --- ROTAS DA API (PROTEGIDAS) ---
 app.get('/api/dashboard/stats', protegerRota, async (req, res) => {
   try {
     const totalItensQuery = 'SELECT SUM(e.totalunidades) AS total_itens FROM estoque e';
@@ -436,6 +437,17 @@ app.post('/api/fornecedores', protegerRota, async (req, res) => {
     res.status(201).json({ data: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// ***** NOVA ROTA DE EDIÇÃO DE FORNECEDOR *****
+app.put('/api/fornecedores/:id', protegerRota, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nome } = req.body;
+        if (!nome) { return res.status(400).json({ error: 'O nome é obrigatório.' }); }
+        const result = await pool.query('UPDATE fornecedores SET nome = $1 WHERE id = $2 RETURNING *', [nome, id]);
+        if (result.rowCount === 0) { return res.status(404).json({ error: 'Fornecedor não encontrado.' }); }
+        res.status(200).json({ message: 'Fornecedor atualizado com sucesso!', data: result.rows[0] });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.delete('/api/fornecedores/:id', protegerRota, async (req, res) => {
     try {
         const { id } = req.params;
@@ -455,6 +467,17 @@ app.post('/api/categorias', protegerRota, async (req, res) => {
         if (!nome || !tipo_unidade) { return res.status(400).json({ error: 'Nome e Tipo de Unidade são obrigatórios.' }); }
         const result = await pool.query('INSERT INTO categorias (nome, tipo_unidade) VALUES ($1, $2) RETURNING *', [nome, tipo_unidade]);
         res.status(201).json({ data: result.rows[0] });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// ***** NOVA ROTA DE EDIÇÃO DE CATEGORIA *****
+app.put('/api/categorias/:id', protegerRota, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nome, tipo_unidade } = req.body;
+        if (!nome || !tipo_unidade) { return res.status(400).json({ error: 'Nome e Tipo de Unidade são obrigatórios.' }); }
+        const result = await pool.query('UPDATE categorias SET nome = $1, tipo_unidade = $2 WHERE id = $3 RETURNING *', [nome, tipo_unidade, id]);
+        if (result.rowCount === 0) { return res.status(404).json({ error: 'Categoria não encontrada.' }); }
+        res.status(200).json({ message: 'Categoria atualizada com sucesso!', data: result.rows[0] });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/api/categorias/:id', protegerRota, async (req, res) => {

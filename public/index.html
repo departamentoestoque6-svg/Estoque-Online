@@ -38,6 +38,7 @@
         .btn { background: linear-gradient(135deg, #3498db, #2980b9); color: white; padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
         .btn-success { background: linear-gradient(135deg, #27ae60, #229954); }
         .btn-danger { background-color: #e74c3c; }
+        .btn-edit { background-color: #f39c12; padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; color: white; border: none; border-radius: 4px; }
         .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 4px solid; transition: transform 0.2s; }
         .card-clickable:hover { transform: translateY(-5px); cursor: pointer; }
@@ -315,6 +316,7 @@
             </div>
         </div>
     </div>
+    
     <div id="modalEdicao" class="modal">
         <div class="modal-content">
             <span class="close" onclick="fecharModal()">&times;</span>
@@ -338,6 +340,7 @@
             <button class="btn btn-success" onclick="salvarEdicao()">Salvar Alterações</button>
         </div>
     </div>
+
     <div id="modalFinalizarProducao" class="modal">
         <div class="modal-content">
             <span class="close" onclick="fecharModalProducao()">&times;</span>
@@ -353,6 +356,44 @@
             <button class="btn btn-success" onclick="salvarFinalizacao()">Finalizar Uso</button>
         </div>
     </div>
+
+    <div id="modalEdicaoFornecedor" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModalEditarFornecedor()">&times;</span>
+            <h2>Editar Fornecedor</h2>
+            <input type="hidden" id="editFornecedorIdModal">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editFornecedorNome">Nome do Fornecedor <span style="color: red;">*</span></label>
+                    <input type="text" id="editFornecedorNome">
+                </div>
+            </div>
+            <button class="btn btn-success" onclick="salvarEdicaoFornecedor()">Salvar Alterações</button>
+        </div>
+    </div>
+
+    <div id="modalEdicaoCategoria" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModalEditarCategoria()">&times;</span>
+            <h2>Editar Categoria</h2>
+            <input type="hidden" id="editCategoriaIdModal">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editCategoriaNome">Nome da Categoria <span style="color: red;">*</span></label>
+                    <input type="text" id="editCategoriaNome">
+                </div>
+                <div class="form-group">
+                    <label for="editCategoriaTipo">Tipo de Unidade <span style="color: red;">*</span></label>
+                    <select id="editCategoriaTipo">
+                        <option value="cartela">Cartela (Pacotes de 5000un)</option>
+                        <option value="rolo">Rolo (Unidade individual)</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn btn-success" onclick="salvarEdicaoCategoria()">Salvar Alterações</button>
+        </div>
+    </div>
+
     <script>
         // --- AUTENTICAÇÃO ---
         const token = localStorage.getItem('authToken');
@@ -375,7 +416,7 @@
             saida: { paginaAtual: 1, totalPaginas: 1 },
             fornecedores: { paginaAtual: 1, totalPaginas: 1 }
         };
-        let todosOsProdutos = []; // Nova variável global para armazenar todos os produtos
+        let todosOsProdutos = []; 
 
         // --- FUNÇÕES DE NOTIFICAÇÃO ---
         function pedirPermissaoDeNotificacao(){ if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') { Notification.requestPermission().then(p => { if (p === 'granted') console.log('Permissão para notificações concedida!'); }); } }
@@ -393,7 +434,7 @@
                     fetch(`${API_URL}/producao/em-uso`, { headers: authHeaders }),
                     fetch(`${API_URL}/categorias`, { headers: authHeaders }),
                     fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders }),
-                    fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders }) // Busca TODOS os produtos
+                    fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders })
                 ]);
                 
                 if (estRes.status === 401 || estRes.status === 403) { return fazerLogout(); }
@@ -406,9 +447,9 @@
                 const emUsoData = await usoRes.json();
                 const prefData = await prefRes.json();
                 
-                estoque = estoqueData.data; // Apenas a página atual
+                estoque = estoqueData.data;
                 paginacao.estoque = estoqueData.meta;
-                todosOsProdutos = (await allEstoqueRes.json()).data; // Todos os produtos
+                todosOsProdutos = (await allEstoqueRes.json()).data;
                 
                 saidas = saidasData.data;
                 paginacao.saida = saidasData.meta;
@@ -501,7 +542,7 @@
         async function adicionarEstoque(){ const selCat = document.getElementById('estoqueCategoriaId'); if (!selCat.value) return mostrarMensagem('Por favor, selecione uma categoria.', 'error'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('estoqueUnidades').value) || 0); const item = { produto: document.getElementById('estoqueProduto').value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesAvulsas: unidades, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || !item.categoria_id || (!item.pacotes && !item.unidadesAvulsas && tipo !== 'rolo') || (tipo === 'rolo' && !item.pacotes) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         function editarEstoque(index){ 
             const itemOriginal = estoque[index];
-            const itemGlobal = todosOsProdutos.find(i => i.id === itemOriginal.id); // Busca na lista completa
+            const itemGlobal = todosOsProdutos.find(i => i.id === itemOriginal.id); 
             if (!itemGlobal) { console.error("Item não encontrado para edição."); return; }
             document.getElementById('editId').value = itemGlobal.id; 
             document.getElementById('editProduto').value = itemGlobal.produto; 
@@ -520,23 +561,19 @@
         // --- FUNÇÕES DE SAÍDA ---
         async function registrarSaida(){
             const pId = parseInt(document.getElementById('saidaProduto').value);
-            const itemEstoque = todosOsProdutos.find(i => i.id === pId); // Busca na lista completa
+            const itemEstoque = todosOsProdutos.find(i => i.id === pId); 
             if (!itemEstoque) return mostrarMensagem('Produto não encontrado. Recarregue a página.', 'error');
-            
             const cat = categorias.find(c => c.id === itemEstoque.categoria_id);
             const tipo = cat ? cat.tipo_unidade : 'cartela';
-            
             let total;
             if(tipo === 'rolo') {
                 total = parseInt(document.getElementById('saidaPacotes').value) || 0;
             } else {
                 total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0);
             }
-            
             if (!pId || !document.getElementById('saidaData').value || total === 0) {
                 return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error');
             }
-            
             const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() };
             try {
                 const resPost = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) });
@@ -544,7 +581,7 @@
                 if (!resPost.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); }
                 mostrarMensagem('Saída registrada com sucesso!', 'success');
                 limparFormSaida();
-                await carregarDados(); // Recarrega tudo
+                await carregarDados(); 
             } catch (e) {
                 mostrarMensagem(e.message, 'error');
             }
@@ -553,12 +590,41 @@
         // --- FUNÇÕES DE FORNECEDORES ---
         async function adicionarFornecedor(){ const nomeIn = document.getElementById('fornecedorNome'); const nome = nomeIn.value.trim(); if (!nome) return mostrarMensagem('O nome do fornecedor é obrigatório.', 'error'); try { const res = await fetch('/api/fornecedores', { method: 'POST', headers: authHeaders, body: JSON.stringify({ nome }) }); if (!res.ok) throw new Error('Falha ao adicionar fornecedor'); nomeIn.value = ''; await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function deletarFornecedor(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`/api/fornecedores/${id}`, { method: 'DELETE', headers: authHeaders }); if (!res.ok) throw new Error('Falha ao deletar fornecedor'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        function abrirModalEditarFornecedor(index) { const item = fornecedores[index]; document.getElementById('editFornecedorIdModal').value = item.id; document.getElementById('editFornecedorNome').value = item.nome; document.getElementById('modalEdicaoFornecedor').style.display = 'block'; }
+        function fecharModalEditarFornecedor() { document.getElementById('modalEdicaoFornecedor').style.display = 'none'; }
+        async function salvarEdicaoFornecedor() {
+            const id = document.getElementById('editFornecedorIdModal').value;
+            const nome = document.getElementById('editFornecedorNome').value;
+            if (!nome) { return mostrarMensagem('O nome é obrigatório.', 'error'); }
+            try {
+                const res = await fetch(`${API_URL}/fornecedores/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify({ nome }) });
+                if (!res.ok) throw new Error('Falha ao salvar alterações.');
+                mostrarMensagem('Fornecedor atualizado com sucesso!', 'success');
+                fecharModalEditarFornecedor();
+                await carregarDados();
+            } catch (e) { mostrarMensagem(e.message, 'error'); }
+        }
         
         // --- FUNÇÕES DE CATEGORIA ---
         async function adicionarCategoria() { const nomeInput = document.getElementById('categoriaNome'); const tipoInput = document.getElementById('categoriaTipo'); const data = { nome: nomeInput.value.trim(), tipo_unidade: tipoInput.value }; if (!data.nome || !data.tipo_unidade) return mostrarMensagem('Preencha todos os campos da categoria.', 'error'); try { const res = await fetch('/api/categorias', { method: 'POST', headers: authHeaders, body: JSON.stringify(data) }); if (!res.ok) throw new Error('Falha ao adicionar categoria.'); nomeInput.value = ''; await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function deletarCategoria(id) { if (!confirm('Tem certeza?')) return; try { const res = await fetch(`/api/categorias/${id}`, { method: 'DELETE', headers: authHeaders }); const result = await res.json(); if (!res.ok) throw new Error(result.error || 'Falha ao deletar categoria'); mostrarMensagem('Categoria deletada com sucesso!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
-        function renderizarCategorias() { const tbody = document.getElementById('tabelaCategorias'); tbody.innerHTML = ''; categorias.forEach(c => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${c.nome}</td><td>${c.tipo_unidade}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarCategoria(${c.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
+        function renderizarCategorias() { const tbody = document.getElementById('tabelaCategorias'); tbody.innerHTML = ''; categorias.forEach((c, index) => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${c.nome}</td><td>${c.tipo_unidade}</td><td><button class="btn-edit" onclick="abrirModalEditarCategoria(${index})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarCategoria(${c.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
         function popularDropdownCategorias(selectId, selValue = null) { const sel = document.getElementById(selectId); if (!sel) return; const curVal = sel.value; sel.innerHTML = '<option value="">Selecione...</option>'; categorias.forEach(c => { const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.nome; opt.dataset.tipo = c.tipo_unidade; sel.appendChild(opt); }); sel.value = selValue || curVal; }
+        function abrirModalEditarCategoria(index) { const item = categorias[index]; document.getElementById('editCategoriaIdModal').value = item.id; document.getElementById('editCategoriaNome').value = item.nome; document.getElementById('editCategoriaTipo').value = item.tipo_unidade; document.getElementById('modalEdicaoCategoria').style.display = 'block'; }
+        function fecharModalEditarCategoria() { document.getElementById('modalEdicaoCategoria').style.display = 'none'; }
+        async function salvarEdicaoCategoria() {
+            const id = document.getElementById('editCategoriaIdModal').value;
+            const nome = document.getElementById('editCategoriaNome').value;
+            const tipo_unidade = document.getElementById('editCategoriaTipo').value;
+            if (!nome || !tipo_unidade) { return mostrarMensagem('Todos os campos são obrigatórios.', 'error'); }
+            try {
+                const res = await fetch(`${API_URL}/categorias/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify({ nome, tipo_unidade }) });
+                if (!res.ok) throw new Error('Falha ao salvar alterações.');
+                mostrarMensagem('Categoria atualizada com sucesso!', 'success');
+                fecharModalEditarCategoria();
+                await carregarDados();
+            } catch (e) { mostrarMensagem(e.message, 'error'); }
+        }
 
         // --- FUNÇÕES DE RELATÓRIOS ---
         async function gerarRelatorioSaidas(){ const de = document.getElementById('relatorioDe').value; const ate = document.getElementById('relatorioAte').value; if (!de || !ate) { return mostrarMensagem('Selecione as duas datas.', 'error'); } try { const res = await fetch(`${API_URL}/relatorios/saidas-por-periodo?de=${de}&ate=${ate}`, { headers: authHeaders }); if (!res.ok) throw new Error('Falha ao gerar relatório.'); const result = await res.json(); renderizarRelatorioSaidas(result.data); } catch (e) { mostrarMensagem(e.message, 'error'); } }
@@ -621,17 +687,19 @@
         function ordenarPor(key){ if (key === 'acoes') return; if (sortConfig.key === key && sortConfig.direction === 'ascending') { sortConfig.direction = 'descending'; } else { sortConfig.direction = 'ascending'; } sortConfig.key = key; renderizarEstoque(); }
         function renderizarEstoque(){ const filtroTxt = document.getElementById('filtroTexto').value.toLowerCase(); const filtroSts = document.getElementById('filtroStatus').value; const tbody = document.getElementById('tabelaEstoque'); tbody.innerHTML = ''; let filtrado = [...estoque].filter(i => { const atTxt = i.produto.toLowerCase().includes(filtroTxt) || (i.fornecedor_nome && i.fornecedor_nome.toLowerCase().includes(filtroTxt)); const atSts = (filtroSts === 'todos') || (getStatusEstoque(i) === filtroSts); return atTxt && atSts; }); filtrado.sort((a, b) => { const key = sortConfig.key; const dir = sortConfig.direction === 'ascending' ? 1 : -1; const valA = key === 'status' ? getStatusEstoque(a) : a[key] || (typeof a[key] === 'number' ? 0 : ''); const valB = key === 'status' ? getStatusEstoque(b) : b[key] || (typeof b[key] === 'number' ? 0 : ''); if (typeof valA === 'string') { return valA.localeCompare(valB) * dir; } if (valA < valB) return -1 * dir; if (valA > valB) return 1 * dir; return 0; }); document.querySelectorAll('.sort-arrow').forEach(a => a.innerHTML = ''); const arrow = document.getElementById(`arrow-${sortConfig.key}`); if (arrow) { arrow.innerHTML = sortConfig.direction === 'ascending' ? '▲' : '▼'; } filtrado.forEach((item, index) => { const tr = document.createElement('tr'); const status = getStatusEstoque(item); let badge = 'badge-success'; if (status === 'baixo') badge = 'badge-warning'; if (status === 'critico') badge = 'badge-danger'; tr.innerHTML = `<td><button style="padding: 5px 10px; font-size: 12px; margin-right: 5px; cursor:pointer; background-color: #3498db; color: white; border: none; border-radius: 4px;" onclick="editarEstoque(${index})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size: 12px; margin: 0; cursor:pointer;" onclick="excluirEstoque(${item.id})">Excluir</button></td><td><span class="badge ${badge}">${status.toUpperCase()}</span></td><td>${item.produto}</td><td>${item.categoria_nome || '-'}</td><td>${item.fornecedor_nome || '-'}</td><td class="number">${(item.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(item.custoporpacote)}</td><td>${formatarData(item.ultimaentrada)}</td>`; tbody.appendChild(tr); }); }
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
-        function renderizarFornecedores(){ const tbody = document.getElementById('tabelaFornecedores'); tbody.innerHTML = ''; fornecedores.forEach(f => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
+        function renderizarFornecedores(){ const tbody = document.getElementById('tabelaFornecedores'); tbody.innerHTML = ''; fornecedores.forEach((f, index) => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-edit" onclick="abrirModalEditarFornecedor(${index})">Editar</button><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
         function popularDropdownFornecedores(selectId, selValue = null){ const sel = document.getElementById(selectId); if (!sel) return; const curVal = sel.value; sel.innerHTML = '<option value="">Sem Fornecedor</option>'; fornecedores.forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = f.nome; sel.appendChild(opt); }); sel.value = selValue || curVal; }
         function popularDropdownProducao() { const sel = document.getElementById('producaoProduto'); sel.innerHTML = '<option value="">Selecione um rolo...</option>'; todosOsProdutos.forEach(i => { const cat = categorias.find(c => c.id === i.categoria_id); if (cat && cat.tipo_unidade === 'rolo' && i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${i.totalunidades})`; sel.appendChild(opt); } }); }
         function renderizarProducaoEmUso() { const tbody = document.getElementById('tabelaProducaoEmUso'); tbody.innerHTML = ''; emUso.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto_nome}</td><td>${formatarData(i.data_inicio)}</td><td><button class="btn-success" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="finalizarProducao(${i.id})">Finalizar Uso</button></td>`; tbody.appendChild(tr); }); }
-        function atualizarProdutosDisponiveis(){ 
+        async function atualizarProdutosDisponiveis(){ 
+            const res = await fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders }); 
+            if(res.status === 401 || res.status === 403) return fazerLogout();
+            const dadosCompletos = (await res.json()).data;
             const sel = document.getElementById('saidaProduto'); 
             sel.innerHTML = '<option value="">Selecione...</option>'; 
-            todosOsProdutos.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); 
+            dadosCompletos.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); 
         }
         
-        // CORREÇÃO: Adiciona a função ajustarCamposSaida
         function ajustarCamposSaida() {
             const sel = document.getElementById('saidaProduto');
             if (!sel.value) return;
@@ -639,17 +707,10 @@
             if (!item) return;
             const cat = categorias.find(c => c.id === item.categoria_id);
             const tipo = cat ? cat.tipo_unidade : 'cartela';
-
             const lblPacotes = document.getElementById('labelSaidaPacotes');
             const grpUnidades = document.getElementById('groupSaidaUnidades');
-
-            if (tipo === 'rolo') {
-                lblPacotes.textContent = 'Quantidade (Rolos)';
-                grpUnidades.style.display = 'none';
-            } else {
-                lblPacotes.textContent = 'Pacotes';
-                grpUnidades.style.display = 'block';
-            }
+            if (tipo === 'rolo') { lblPacotes.textContent = 'Quantidade (Rolos)'; grpUnidades.style.display = 'none'; } 
+            else { lblPacotes.textContent = 'Pacotes'; grpUnidades.style.display = 'block'; }
         }
         
         function limparFormEstoque(){ document.getElementById('estoqueProduto').value = ''; document.getElementById('estoqueFornecedorId').value = ''; document.getElementById('estoqueCategoriaId').value = ''; document.getElementById('estoquePacotes').value = '0'; document.getElementById('estoqueUnidades').value = '0'; document.getElementById('estoqueCusto').value = ''; document.getElementById('estoqueMinimo').value = ''; document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0]; ajustarCamposProduto(); }
@@ -657,6 +718,8 @@
         
         function fecharModal(){ document.getElementById('modalEdicao').style.display = 'none'; }
         function fecharModalProducao() { document.getElementById('modalFinalizarProducao').style.display = 'none'; }
+        function fecharModalEditarFornecedor() { document.getElementById('modalEdicaoFornecedor').style.display = 'none'; }
+        function fecharModalEditarCategoria() { document.getElementById('modalEdicaoCategoria').style.display = 'none'; }
 
         function mostrarMensagem(msg, tipo){ const el = (tipo === 'success') ? document.getElementById('successMessage') : document.getElementById('errorMessage'); document.getElementById('successMessage').style.display = 'none'; document.getElementById('errorMessage').style.display = 'none'; el.textContent = msg; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 5000); }
         function formatarMoeda(valor){ return 'R$ ' + (valor || 0).toFixed(2).replace('.', ','); }
@@ -706,7 +769,13 @@
         window.toggleMenu = toggleMenu;
         window.salvarPreferencias = salvarPreferencias;
         window.testarAlertas = testarAlertas;
-        window.ajustarCamposSaida = ajustarCamposSaida; // <-- Adiciona a nova função
+        window.ajustarCamposSaida = ajustarCamposSaida;
+        window.abrirModalEditarFornecedor = abrirModalEditarFornecedor;
+        window.fecharModalEditarFornecedor = fecharModalEditarFornecedor;
+        window.salvarEdicaoFornecedor = salvarEdicaoFornecedor;
+        window.abrirModalEditarCategoria = abrirModalEditarCategoria;
+        window.fecharModalEditarCategoria = fecharModalEditarCategoria;
+        window.salvarEdicaoCategoria = salvarEdicaoCategoria;
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>
