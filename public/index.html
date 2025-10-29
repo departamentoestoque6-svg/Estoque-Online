@@ -154,10 +154,10 @@
                      <div class="section">
                         <h3>Registrar Consumo Geral</h3>
                         <div class="form-row">
-                            <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto"></select></div>
+                            <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto" onchange="ajustarCamposSaida()"></select></div>
                             <div class="form-group"><label for="saidaData">Data <span style="color: red;">*</span></label><input type="date" id="saidaData"></div>
-                            <div class="form-group"><label for="saidaPacotes">Pacotes</label><input type="number" id="saidaPacotes" value="0" min="0"></div>
-                            <div class="form-group"><label for="saidaUnidades">Unidades</label><input type="number" id="saidaUnidades" value="0" min="0"></div>
+                            <div class="form-group"><label for="saidaPacotes" id="labelSaidaPacotes">Pacotes</label><input type="number" id="saidaPacotes" value="0" min="0"></div>
+                            <div class="form-group" id="groupSaidaUnidades"><label for="saidaUnidades">Unidades</label><input type="number" id="saidaUnidades" value="0" min="0"></div>
                              <div class="form-group"><label for="saidaDestino">Destino/Motivo</label><input type="text" id="saidaDestino" placeholder="Ex: Perda, Uso diverso..."></div>
                         </div>
                         <button class="btn btn-success" onclick="registrarSaida()">Registrar Consumo</button>
@@ -375,6 +375,7 @@
             saida: { paginaAtual: 1, totalPaginas: 1 },
             fornecedores: { paginaAtual: 1, totalPaginas: 1 }
         };
+        let todosOsProdutos = []; // Nova variável global para armazenar todos os produtos
 
         // --- FUNÇÕES DE NOTIFICAÇÃO ---
         function pedirPermissaoDeNotificacao(){ if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') { Notification.requestPermission().then(p => { if (p === 'granted') console.log('Permissão para notificações concedida!'); }); } }
@@ -384,18 +385,19 @@
         async function carregarDados() {
             document.getElementById('saveStatus').textContent = 'Carregando...';
             try {
-                const [estRes, saiRes, staRes, fornRes, usoRes, catRes, prefRes] = await Promise.all([
+                const [estRes, saiRes, staRes, fornRes, usoRes, catRes, prefRes, allEstoqueRes] = await Promise.all([
                     fetch(`${API_URL}/estoque?pagina=${paginacao.estoque.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/saidas?pagina=${paginacao.saida.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/dashboard/stats`, { headers: authHeaders }), 
                     fetch(`${API_URL}/fornecedores?pagina=${paginacao.fornecedores.paginaAtual}`, { headers: authHeaders }), 
                     fetch(`${API_URL}/producao/em-uso`, { headers: authHeaders }),
                     fetch(`${API_URL}/categorias`, { headers: authHeaders }),
-                    fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders })
+                    fetch(`${API_URL}/usuarios/preferencias`, { headers: authHeaders }),
+                    fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders }) // Busca TODOS os produtos
                 ]);
                 
                 if (estRes.status === 401 || estRes.status === 403) { return fazerLogout(); }
-                if (!estRes.ok || !saiRes.ok || !staRes.ok || !fornRes.ok || !usoRes.ok || !catRes.ok || !prefRes.ok) throw new Error('Falha ao buscar dados do servidor.');
+                if (!estRes.ok || !saiRes.ok || !staRes.ok || !fornRes.ok || !usoRes.ok || !catRes.ok || !prefRes.ok || !allEstoqueRes.ok) throw new Error('Falha ao buscar dados do servidor.');
                 
                 const estoqueData = await estRes.json();
                 const saidasData = await saiRes.json();
@@ -404,8 +406,10 @@
                 const emUsoData = await usoRes.json();
                 const prefData = await prefRes.json();
                 
-                estoque = estoqueData.data;
+                estoque = estoqueData.data; // Apenas a página atual
                 paginacao.estoque = estoqueData.meta;
+                todosOsProdutos = (await allEstoqueRes.json()).data; // Todos os produtos
+                
                 saidas = saidasData.data;
                 paginacao.saida = saidasData.meta;
                 fornecedores = fornecedoresData.data;
@@ -462,13 +466,10 @@
 
         // --- FUNÇÕES DO DASHBOARD ---
         function atualizarDashboard(stats){ document.getElementById('dashTotalEstoque').textContent = `${parseFloat(stats.totalItens || 0).toLocaleString()} un`; document.getElementById('dashValorEstoque').textContent = formatarMoeda(parseFloat(stats.valorTotal || 0)); document.getElementById('dashCriticos').textContent = stats.itensCriticos || 0; }
-        async function renderizarGrafico(){ 
-            const res = await fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders });
-            if(res.status === 401 || res.status === 403) return fazerLogout();
-            const dadosCompletos = (await res.json()).data;
+        function renderizarGrafico(){ 
             const ctx = document.getElementById('graficoEstoque').getContext('2d'); 
             if (meuGrafico) { meuGrafico.destroy(); } 
-            const top5 = [...dadosCompletos].sort((a, b) => b.totalunidades - a.totalunidades).slice(0, 5); 
+            const top5 = [...todosOsProdutos].sort((a, b) => b.totalunidades - a.totalunidades).slice(0, 5); 
             const labels = top5.map(item => item.produto); 
             const data = top5.map(item => item.totalunidades); 
             meuGrafico = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Quantidade em Estoque', data: data, backgroundColor: 'rgba(52, 152, 219, 0.7)', borderColor: 'rgba(41, 128, 185, 1)', borderWidth: 1 }] }, options: { scales: { y: { beginAtZero: true } }, responsive: true } }); 
@@ -500,7 +501,7 @@
         async function adicionarEstoque(){ const selCat = document.getElementById('estoqueCategoriaId'); if (!selCat.value) return mostrarMensagem('Por favor, selecione uma categoria.', 'error'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('estoqueUnidades').value) || 0); const item = { produto: document.getElementById('estoqueProduto').value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesAvulsas: unidades, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || !item.categoria_id || (!item.pacotes && !item.unidadesAvulsas && tipo !== 'rolo') || (tipo === 'rolo' && !item.pacotes) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         function editarEstoque(index){ 
             const itemOriginal = estoque[index];
-            const itemGlobal = estoque.find(i => i.id === itemOriginal.id); 
+            const itemGlobal = todosOsProdutos.find(i => i.id === itemOriginal.id); // Busca na lista completa
             if (!itemGlobal) { console.error("Item não encontrado para edição."); return; }
             document.getElementById('editId').value = itemGlobal.id; 
             document.getElementById('editProduto').value = itemGlobal.produto; 
@@ -517,7 +518,37 @@
         async function excluirEstoque(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE', headers: authHeaders }); if (!res.ok) throw new Error('Falha ao deletar o item.'); mostrarMensagem('Item deletado com sucesso!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
         // --- FUNÇÕES DE SAÍDA ---
-        async function registrarSaida(){ const pId = parseInt(document.getElementById('saidaProduto').value); const res = await fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders }); const todosItens = (await res.json()).data; const itemEstoque = todosItens.find(i => i.id === pId); if (!itemEstoque) return mostrarMensagem('Produto não encontrado.', 'error'); const cat = categorias.find(c => c.id === itemEstoque.categoria_id); const tipo = cat ? cat.tipo_unidade : 'cartela'; let total; if(tipo === 'rolo') { total = parseInt(document.getElementById('saidaPacotes').value) || 0; } else { total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0); } if (!pId || !document.getElementById('saidaData').value || total === 0) { return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error'); } const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() }; try { const resPost = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) }); const result = await resPost.json(); if (!resPost.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); } mostrarMensagem('Saída registrada com sucesso!', 'success'); limparFormSaida(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function registrarSaida(){
+            const pId = parseInt(document.getElementById('saidaProduto').value);
+            const itemEstoque = todosOsProdutos.find(i => i.id === pId); // Busca na lista completa
+            if (!itemEstoque) return mostrarMensagem('Produto não encontrado. Recarregue a página.', 'error');
+            
+            const cat = categorias.find(c => c.id === itemEstoque.categoria_id);
+            const tipo = cat ? cat.tipo_unidade : 'cartela';
+            
+            let total;
+            if(tipo === 'rolo') {
+                total = parseInt(document.getElementById('saidaPacotes').value) || 0;
+            } else {
+                total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0);
+            }
+            
+            if (!pId || !document.getElementById('saidaData').value || total === 0) {
+                return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error');
+            }
+            
+            const saida = { data: document.getElementById('saidaData').value, produtoId: pId, totalUnidades: total, destino: document.getElementById('saidaDestino').value.trim() };
+            try {
+                const resPost = await fetch(`${API_URL}/saidas`, { method: 'POST', headers: authHeaders, body: JSON.stringify(saida) });
+                const result = await resPost.json();
+                if (!resPost.ok) { throw new Error(result.error || 'Falha ao registrar saída.'); }
+                mostrarMensagem('Saída registrada com sucesso!', 'success');
+                limparFormSaida();
+                await carregarDados(); // Recarrega tudo
+            } catch (e) {
+                mostrarMensagem(e.message, 'error');
+            }
+        }
         
         // --- FUNÇÕES DE FORNECEDORES ---
         async function adicionarFornecedor(){ const nomeIn = document.getElementById('fornecedorNome'); const nome = nomeIn.value.trim(); if (!nome) return mostrarMensagem('O nome do fornecedor é obrigatório.', 'error'); try { const res = await fetch('/api/fornecedores', { method: 'POST', headers: authHeaders, body: JSON.stringify({ nome }) }); if (!res.ok) throw new Error('Falha ao adicionar fornecedor'); nomeIn.value = ''; await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
@@ -592,19 +623,37 @@
         function renderizarSaidas(){ const tbody = document.getElementById('tabelaSaida'); tbody.innerHTML = ''; saidas.forEach(s => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${formatarData(s.data)}</td><td>${s.produtonome}</td><td class="number">${(s.totalunidades || 0).toLocaleString()}</td><td class="currency">${formatarMoeda(s.custototal)}</td><td>${s.destino || '-'}</td>`; tbody.appendChild(tr); }); }
         function renderizarFornecedores(){ const tbody = document.getElementById('tabelaFornecedores'); tbody.innerHTML = ''; fornecedores.forEach(f => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${f.nome}</td><td><button class="btn-danger" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="deletarFornecedor(${f.id})">Excluir</button></td>`; tbody.appendChild(tr); }); }
         function popularDropdownFornecedores(selectId, selValue = null){ const sel = document.getElementById(selectId); if (!sel) return; const curVal = sel.value; sel.innerHTML = '<option value="">Sem Fornecedor</option>'; fornecedores.forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = f.nome; sel.appendChild(opt); }); sel.value = selValue || curVal; }
-        function popularDropdownProducao() { const sel = document.getElementById('producaoProduto'); sel.innerHTML = '<option value="">Selecione um rolo...</option>'; estoque.forEach(i => { const cat = categorias.find(c => c.id === i.categoria_id); if (cat && cat.tipo_unidade === 'rolo' && i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${i.totalunidades})`; sel.appendChild(opt); } }); }
+        function popularDropdownProducao() { const sel = document.getElementById('producaoProduto'); sel.innerHTML = '<option value="">Selecione um rolo...</option>'; todosOsProdutos.forEach(i => { const cat = categorias.find(c => c.id === i.categoria_id); if (cat && cat.tipo_unidade === 'rolo' && i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${i.totalunidades})`; sel.appendChild(opt); } }); }
         function renderizarProducaoEmUso() { const tbody = document.getElementById('tabelaProducaoEmUso'); tbody.innerHTML = ''; emUso.forEach(i => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${i.produto_nome}</td><td>${formatarData(i.data_inicio)}</td><td><button class="btn-success" style="padding: 5px 10px; font-size:12px; margin:0;" onclick="finalizarProducao(${i.id})">Finalizar Uso</button></td>`; tbody.appendChild(tr); }); }
-        async function atualizarProdutosDisponiveis(){ 
-            const res = await fetch(`${API_URL}/estoque?pagina=1&limite=1000`, { headers: authHeaders }); 
-            if(res.status === 401 || res.status === 403) return fazerLogout();
-            const dadosCompletos = (await res.json()).data;
+        function atualizarProdutosDisponiveis(){ 
             const sel = document.getElementById('saidaProduto'); 
             sel.innerHTML = '<option value="">Selecione...</option>'; 
-            dadosCompletos.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); 
+            todosOsProdutos.forEach(i => { if (i.totalunidades > 0) { const opt = document.createElement('option'); opt.value = i.id; opt.textContent = `${i.produto} (Disponível: ${(i.totalunidades || 0).toLocaleString()} un)`; sel.appendChild(opt); } }); 
+        }
+        
+        // CORREÇÃO: Adiciona a função ajustarCamposSaida
+        function ajustarCamposSaida() {
+            const sel = document.getElementById('saidaProduto');
+            if (!sel.value) return;
+            const item = todosOsProdutos.find(i => i.id == sel.value);
+            if (!item) return;
+            const cat = categorias.find(c => c.id === item.categoria_id);
+            const tipo = cat ? cat.tipo_unidade : 'cartela';
+
+            const lblPacotes = document.getElementById('labelSaidaPacotes');
+            const grpUnidades = document.getElementById('groupSaidaUnidades');
+
+            if (tipo === 'rolo') {
+                lblPacotes.textContent = 'Quantidade (Rolos)';
+                grpUnidades.style.display = 'none';
+            } else {
+                lblPacotes.textContent = 'Pacotes';
+                grpUnidades.style.display = 'block';
+            }
         }
         
         function limparFormEstoque(){ document.getElementById('estoqueProduto').value = ''; document.getElementById('estoqueFornecedorId').value = ''; document.getElementById('estoqueCategoriaId').value = ''; document.getElementById('estoquePacotes').value = '0'; document.getElementById('estoqueUnidades').value = '0'; document.getElementById('estoqueCusto').value = ''; document.getElementById('estoqueMinimo').value = ''; document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0]; ajustarCamposProduto(); }
-        function limparFormSaida(){ document.getElementById('saidaProduto').value = ''; document.getElementById('saidaData').value = new Date().toISOString().split('T')[0]; document.getElementById('saidaPacotes').value = '0'; document.getElementById('saidaUnidades').value = '0'; document.getElementById('saidaDestino').value = ''; }
+        function limparFormSaida(){ document.getElementById('saidaProduto').value = ''; document.getElementById('saidaData').value = new Date().toISOString().split('T')[0]; document.getElementById('saidaPacotes').value = '0'; document.getElementById('saidaUnidades').value = '0'; document.getElementById('saidaDestino').value = ''; ajustarCamposSaida(); }
         
         function fecharModal(){ document.getElementById('modalEdicao').style.display = 'none'; }
         function fecharModalProducao() { document.getElementById('modalFinalizarProducao').style.display = 'none'; }
@@ -657,6 +706,7 @@
         window.toggleMenu = toggleMenu;
         window.salvarPreferencias = salvarPreferencias;
         window.testarAlertas = testarAlertas;
+        window.ajustarCamposSaida = ajustarCamposSaida; // <-- Adiciona a nova função
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>
