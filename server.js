@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% COMPLETA (com Rota Cron Secreta)
+// server.js - VERSÃO 100% COMPLETA (com SendGrid)
 
 require('dotenv').config();
 const express = require('express');
@@ -7,7 +7,7 @@ const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail'); // <-- MUDANÇA
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,15 +18,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-const emailRemetente = process.env.EMAIL_REMETENTE;
-const emailSenha = process.env.EMAIL_SENHA;
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: emailRemetente,
-        pass: emailSenha
-    }
-});
+// Configura o SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY); // <-- MUDANÇA
+const emailRemetente = process.env.EMAIL_REMETENTE; // <-- MUDANÇA
 
 // --- CRIAÇÃO DE TABELAS ---
 const createTables = async () => {
@@ -192,23 +186,26 @@ app.put('/api/usuarios/preferencias', protegerRota, async (req, res) => {
 
 // --- FUNÇÃO E ROTA DE VERIFICAÇÃO DE ALERTAS ---
 async function enviarEmailAlerta(para, assunto, textoHtml) {
-    if (!emailRemetente || !emailSenha) {
-        console.error("ERRO: EMAIL_REMETENTE ou EMAIL_SENHA não definidos. Email não pode ser enviado.");
-        return false;
+    if (!emailRemetente || !process.env.SENDGRID_API_KEY) {
+        console.error("ERRO: SENDGRID_API_KEY ou EMAIL_REMETENTE não definidos. Email não pode ser enviado.");
+        throw new Error("Serviço de email não configurado.");
     }
     const msg = {
-        from: `"Sistema de Estoque" <${emailRemetente}>`,
-        to: para,
+        to: para, // Pode ser um array de emails
+        from: emailRemetente, // O email verificado no SendGrid
         subject: assunto,
         html: textoHtml,
     };
     try {
-        await transporter.sendMail(msg);
+        await sgMail.send(msg);
         console.log(`Email enviado com sucesso para ${para}`);
         return true;
     } catch (error) {
-        console.error('Erro ao enviar email pelo NodeMailer/Gmail:', error);
-        return false;
+        console.error('Erro ao enviar email pelo SendGrid:', error);
+        if (error.response) {
+            console.error(error.response.body);
+        }
+        throw error;
     }
 }
 
@@ -238,19 +235,14 @@ async function verificarEEnviarAlertas() {
             return { message: 'Itens críticos encontrados, mas nenhum usuário optou por receber alertas.' };
         }
 
-        const enviado = await enviarEmailAlerta(destinatarios.join(', '), 'Alerta de Estoque Crítico', corpoHtml);
-        if (enviado) {
-            return { message: `Alertas de estoque crítico enviados para ${destinatarios.length} usuário(s).` };
-        } else {
-            throw new Error("Falha no transporte do email.");
-        }
+        await enviarEmailAlerta(destinatarios, 'Alerta de Estoque Crítico', corpoHtml);
+        return { message: `Alertas de estoque crítico enviados para ${destinatarios.length} usuário(s).` };
     } catch (err) {
         console.error("Erro na verificação de alertas:", err);
         throw err;
     }
 }
 
-// Rota de teste manual (protegida)
 app.post('/api/estoque/verificar-alertas', protegerRota, async (req, res) => {
     try {
         const resultado = await verificarEEnviarAlertas();
@@ -260,11 +252,9 @@ app.post('/api/estoque/verificar-alertas', protegerRota, async (req, res) => {
     }
 });
 
-// NOVA ROTA PÚBLICA PARA O CRON JOB
 app.get('/api/cron/verificar-alertas/:secret', async (req, res) => {
     const { secret } = req.params;
     const cronSecret = process.env.CRON_SECRET;
-
     if (!cronSecret) {
         console.log("CRON JOB falhou: CRON_SECRET não está definido no ambiente.");
         return res.status(500).json({ error: 'Serviço de cron não configurado.' });
@@ -273,7 +263,6 @@ app.get('/api/cron/verificar-alertas/:secret', async (req, res) => {
         console.log("CRON JOB falhou: Segredo inválido.");
         return res.status(401).json({ error: 'Não autorizado.' });
     }
-
     try {
         const resultado = await verificarEEnviarAlertas();
         res.status(200).json(resultado);

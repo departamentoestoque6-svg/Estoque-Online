@@ -453,9 +453,9 @@
                 const novaPagina = paginacao[tipo].paginaAtual + direcao;
                 if (novaPagina > 0 && novaPagina <= paginacao[tipo].totalPaginas) {
                     paginacao[tipo].paginaAtual = novaPagina;
-                    if(tipo === 'estoque') await carregarDados(); // Recarrega tudo
-                    else if(tipo === 'saida') await carregarDados(); // Recarrega tudo
-                    else if(tipo === 'fornecedores') await carregarDados(); // Recarrega tudo
+                    if(tipo === 'estoque') await carregarDados(); 
+                    else if(tipo === 'saida') await carregarDados(); 
+                    else if(tipo === 'fornecedores') await carregarDados(); 
                 }
             }
         }
