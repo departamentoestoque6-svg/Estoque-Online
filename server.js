@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% LIMPA E CORRIGIDA (Bug "Embalagem" + Sem Erros de Sintaxe)
+// server.js - VERSÃO 100% LIMPA E CORRIGIDA (Bug "Embalagem" + Bug "createTables" + Sem Lixo)
 
 require('dotenv').config();
 const express = require('express');
@@ -63,24 +63,27 @@ const createTables = async () => {
     );
   `;
   try {
+    // 1. GARANTE QUE TODAS AS TABELAS EXISTEM
+    await pool.query(queryText); 
+
+    // 2. RODA A LÓGICA DE MIGRAÇÃO (se necessário)
     try {
         await pool.query('SELECT categoria_id FROM estoque LIMIT 1');
     } catch (e) {
-        if (e.code === '42703') { 
-            console.log('Detectada estrutura antiga. Limpando e recriando tabelas...');
+        if (e.code === '42703') { // 42703 = undefined_column (coluna não existe, versão antiga)
+            console.log('Detectada estrutura antiga (sem categoria_id). Limpando e recriando tabelas...');
             await pool.query('DROP TABLE IF EXISTS saidas; DROP TABLE IF EXISTS uso_producao; DROP TABLE IF EXISTS estoque; DROP TABLE IF EXISTS categorias; DROP TABLE IF EXISTS fornecedores;');
-            await pool.query(queryText); 
+            await pool.query(queryText); // Recria tudo
         }
     }
     try {
         await pool.query('SELECT receber_alertas FROM usuarios LIMIT 1');
     } catch (e) {
-        if (e.code === '42703') {
+        if (e.code === '42703') { // Coluna não existe
             console.log('Adicionando coluna "receber_alertas" na tabela usuarios.');
             await pool.query('ALTER TABLE usuarios ADD COLUMN receber_alertas BOOLEAN DEFAULT false');
         }
     }
-    await pool.query(queryText); 
     console.log('Tabelas verificadas/criadas com sucesso.');
   } catch (err) { console.error('Erro ao criar tabelas:', err); }
 };
@@ -139,7 +142,7 @@ app.post('/api/usuarios/login', async (req, res) => {
     const { email, senha } = req.body;
     const userRes = await pool.query("SELECT * FROM usuarios WHERE email = $1", [email]);
     if (userRes.rows.length === 0) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-    const user = userRes.rows[0];
+   const user = userRes.rows[0];
     const senhaValida = await bcrypt.compare(senha, user.senha);
     if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
     const jwtSecret = process.env.JWT_SECRET || 'seu-segredo-super-secreto-aqui-12345';
@@ -513,7 +516,7 @@ app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
         }
         await pool.query('DELETE FROM categorias WHERE id = $1', [id]);
         res.status(200).json({ message: 'Categoria deletada com sucesso!' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  t } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
   try {
@@ -618,14 +621,14 @@ app.get('/api/exportar/estoque_atual_csv', protegerRota, async (req, res) => {
             const total = parseInt(item.totalunidades) || 0;
             
             if (item.tipo_unidade === 'rolo' || item.tipo_unidade === 'embalagem') {
-                valor_total = total * custo;
+             valor_total = total * custo;
             } else if (item.tipo_unidade === 'cartela' && custo > 0) {
                 valor_total = (total / 5000.0) * custo; 
             }
 
             const dataRow = {
                 status: status,
-                produto: item.produto || '',
+      s         produto: item.produto || '',
                 categoria_nome: item.categoria_nome || '-',
                 fornecedor_nome: item.fornecedor_nome || '-',
                 totalunidades: total,
