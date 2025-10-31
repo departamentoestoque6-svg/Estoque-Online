@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% CORRIGIDA (Bug da "Embalagem" + Erros de Sintaxe)
+// server.js - VERSÃO 100% LIMPA E CORRIGIDA (Bug "Embalagem" + Sem Erros de Sintaxe)
 
 require('dotenv').config();
 const express = require('express');
@@ -274,7 +274,7 @@ app.get('/api/cron/verificar-alertas/:secret', async (req, res) => {
     if (secret !== cronSecret) {
         console.log("CRON JOB falhou: Segredo inválido.");
         return res.status(401).json({ error: 'Não autorizado.' });
-  _ }
+    }
     try {
         const resultado = await verificarEEnviarAlertas();
         res.status(200).json(resultado);
@@ -357,7 +357,6 @@ app.post('/api/estoque', protegerRota, async (req, res) => {
         if (catRes.rows.length === 0) return res.status(400).json({ error: 'Categoria não encontrada.' });
         const tipo = catRes.rows[0].tipo_unidade;
         
-        // ***** CORREÇÃO APLICADA AQUI *****
         const totalUnidadesAdicionadas = (tipo === 'rolo' || tipo === 'embalagem') ? pacotes : (pacotes * 5000) + unidadesAvulsas;
         
         const selectRes = await pool.query('SELECT * FROM estoque WHERE produto = $1 AND (fornecedor_id = $2 OR (fornecedor_id IS NULL AND $2 IS NULL))', [produto, fornecedor_id || null]);
@@ -372,7 +371,7 @@ app.post('/api/estoque', protegerRota, async (req, res) => {
             );
         } else {
             const novosPacotes = (tipo === 'rolo' || tipo === 'embalagem') ? totalUnidadesAdicionadas : pacotes;
-            const novasUnidadesAvulsas = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : unidadesAvulsas; // Correção aqui também
+            const novasUnidadesAvulsas = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : unidadesAvulsas;
             await pool.query(
                 'INSERT INTO estoque (produto, fornecedor_id, categoria_id, pacotes, unidadesavulsas, totalunidades, custoporpacote, estoqueminimo, ultimaentrada) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
                 [produto, fornecedor_id || null, categoria_id, novosPacotes, novasUnidadesAvulsas, totalUnidadesAdicionadas, custoPorPacote, estoqueMinimo, ultimaEntrada]
@@ -389,10 +388,9 @@ app.put('/api/estoque/:id', protegerRota, async (req, res) => {
     if (catRes.rows.length === 0) return res.status(400).json({ error: 'Categoria não encontrada.' });
     const tipo = catRes.rows[0].tipo_unidade;
     
-    // ***** CORREÇÃO APLICADA AQUI *****
     const totalunidades = (tipo === 'rolo' || tipo === 'embalagem') ? pacotes : (pacotes * 5000) + unidadesavulsas;
-    const pacotesCorrigido = (tipo === 'rolo' || tipo === 'embalagem') ? totalunidades : pacotes; // Garante que pacotes = total para rolo/embalagem
-    const unidadesCorrigido = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : unidadesavulsas; // Garante que unidades = 0 para rolo/embalagem
+    const pacotesCorrigido = (tipo === 'rolo' || tipo === 'embalagem') ? totalunidades : pacotes;
+    const unidadesCorrigido = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : unidadesavulsas;
     
     const updateQuery = `UPDATE estoque SET fornecedor_id = $1, pacotes = $2, unidadesavulsas = $3, totalunidades = $4, custoporpacote = $5, estoqueminimo = $6, categoria_id = $7 WHERE id = $8`;
     const result = await pool.query(updateQuery, [fornecedor_id, pacotesCorrigido, unidadesCorrigido, totalunidades, custoporpacote, estoqueminimo, categoria_id, id]);
@@ -409,7 +407,6 @@ app.delete('/api/estoque/:id', protegerRota, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ***** ROTA DE SAÍDA COM CORREÇÃO 'FOR UPDATE OF e' *****
 app.post('/api/saidas', protegerRota, async (req, res) => {
   const { data, produtoId, totalUnidades, destino } = req.body;
   const client = await pool.connect();
@@ -425,7 +422,6 @@ app.post('/api/saidas', protegerRota, async (req, res) => {
     const tipo = item.tipo_unidade;
     const novoTotalUnidades = item.totalunidades - totalUnidades;
     
-    // ***** CORREÇÃO APLICADA AQUI *****
     const novosPacotes = (tipo === 'rolo' || tipo === 'embalagem') ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000);
     const novasUnidadesAvulsas = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : novoTotalUnidades % 5000;
     const custoDaSaida = (tipo === 'rolo' || tipo === 'embalagem') ? totalUnidades * item.custoporpacote : (totalUnidades / 5000) * item.custoporpacote;
@@ -438,7 +434,7 @@ app.post('/api/saidas', protegerRota, async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Erro ao registrar saída:", err);
-  t res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   } finally {
     client.release();
   }
@@ -621,7 +617,6 @@ app.get('/api/exportar/estoque_atual_csv', protegerRota, async (req, res) => {
             const custo = parseFloat(item.custoporpacote) || 0;
             const total = parseInt(item.totalunidades) || 0;
             
-            // ***** CORREÇÃO APLICADA AQUI *****
             if (item.tipo_unidade === 'rolo' || item.tipo_unidade === 'embalagem') {
                 valor_total = total * custo;
             } else if (item.tipo_unidade === 'cartela' && custo > 0) {
@@ -635,7 +630,7 @@ app.get('/api/exportar/estoque_atual_csv', protegerRota, async (req, res) => {
                 fornecedor_nome: item.fornecedor_nome || '-',
                 totalunidades: total,
                 custoporpacote: custo.toFixed(2),
-test             valor_total: valor_total.toFixed(2),
+                valor_total: valor_total.toFixed(2),
                 estoqueminimo: item.estoqueminimo || 0,
                 ultimaentrada: formatarDataParaCSV(item.ultimaentrada)
             };
@@ -658,10 +653,9 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
         const estoqueRes = await client.query('SELECT e.*, c.tipo_unidade FROM estoque e LEFT JOIN categorias c ON e.categoria_id = c.id WHERE e.id = $1 FOR UPDATE OF e', [estoque_id]);
         if (estoqueRes.rows.length === 0) throw new Error('Produto não encontrado no estoque.');
         const item = estoqueRes.rows[0];
-  t     if (item.totalunidades < 1) throw new Error('Estoque insuficiente para iniciar o uso.');
+        if (item.totalunidades < 1) throw new Error('Estoque insuficiente para iniciar o uso.');
         const novoTotalUnidades = item.totalunidades - 1;
         
-        // ***** CORREÇÃO APLICADA AQUI *****
         const novosPacotes = (item.tipo_unidade === 'rolo' || item.tipo_unidade === 'embalagem') ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000);
         
         await client.query('UPDATE estoque SET totalunidades = $1, pacotes = $2 WHERE id = $3', [novoTotalUnidades, novosPacotes, estoque_id]);
