@@ -531,7 +531,7 @@ app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
         }
         await pool.query('DELETE FROM categorias WHERE id = $1', [id]);
         res.status(200).json({ message: 'Categoria deletada com sucesso!' });
-  a } catch (err) { res.status(500).json({ error: err.message }); }
+  TA } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
   try {
@@ -578,7 +578,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         };
         const relatorioProcessado = result.rows.map(item => {
             const diasUteis = calcularDiasUteis(item.data_inicio, item.data_fim);
-         const custoTotalDoRolo = item.custoporpacote;
+            const custoTotalDoRolo = item.custoporpacote;
             const custoPorDia = custoTotalDoRolo / diasUteis;
             const mediaEtiquetasPorDia = item.etiquetas_impressas ? item.etiquetas_impressas / diasUteis : null;
             return { ...item, dias_uteis: diasUteis, custo_dia: custoPorDia, media_etiquetas_dia: mediaEtiquetasPorDia };
@@ -638,7 +638,7 @@ app.get('/api/exportar/estoque_atual_csv', protegerRota, async (req, res) => {
             if (item.tipo_unidade === 'rolo' || item.tipo_unidade === 'embalagem') {
                 valor_total = total * custo;
             } else if (item.tipo_unidade === 'cartela' && custo > 0) {
-                valor_total = (total / 5000.0) * custo; 
+             valor_total = (total / 5000.0) * custo; 
             }
 
             const dataRow = {
@@ -648,19 +648,19 @@ app.get('/api/exportar/estoque_atual_csv', protegerRota, async (req, res) => {
                 fornecedor_nome: item.fornecedor_nome || '-',
                 totalunidades: total,
                 custoporpacote: custo.toFixed(2),
-           valor_total: valor_total.toFixed(2),
+                valor_total: valor_total.toFixed(2),
                 estoqueminimo: item.estoqueminimo || 0,
                 ultimaentrada: formatarDataParaCSV(item.ultimaentrada)
             };
             stringifier.write(dataRow);
-source_file   }
+        }
         
         stringifier.end();
 
     } catch (err) {
         console.error('Erro ao gerar CSV:', err);
         res.status(500).json({ error: 'Erro interno ao gerar relatório CSV.' });
-    }
+A }
 });
 
 app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
@@ -688,22 +688,22 @@ April           [estoque_id, item.produto, data_inicio, 'Em Uso']
         res.status(400).json({ error: err.message });
     } finally {
         client.release();
-    }
+  Não }
 });
 app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
-   try {
+    try {
         const query = `SELECT up.id, up.data_inicio, e.produto AS produto_nome FROM uso_producao up LEFT JOIN estoque e ON up.estoque_id = e.id WHERE up.status = 'Em Uso' ORDER BY up.data_inicio ASC`;
         const result = await pool.query(query);
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
-   const { id } = req.params;
+    const { id } = req.params;
     const { data_fim, etiquetas_impressas } = req.body;
     if (!data_fim) return res.status(400).json({ error: 'Data de finalização é obrigatória.' });
     try {
         const updateQuery = `UPDATE uso_producao SET data_fim = $1, etiquetas_impressas = $2, status = 'Finalizado' WHERE id = $3 RETURNING *`;
-       const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
+        const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
         res.status(200).json({ data: result.rows[0] });
     } catch (err) { res.status(500).json({ error: err.message }); }
