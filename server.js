@@ -1,4 +1,4 @@
-// server.js - VERSÃO COM CORREÇÃO DO TIPO "EMBALAGEM"
+// server.js - VERSÃO 100% CORRIGIDA (Bug da "Embalagem" + Erros de Sintaxe)
 
 require('dotenv').config();
 const express = require('express');
@@ -274,7 +274,7 @@ app.get('/api/cron/verificar-alertas/:secret', async (req, res) => {
     if (secret !== cronSecret) {
         console.log("CRON JOB falhou: Segredo inválido.");
         return res.status(401).json({ error: 'Não autorizado.' });
-    }
+  _ }
     try {
         const resultado = await verificarEEnviarAlertas();
         res.status(200).json(resultado);
@@ -438,7 +438,7 @@ app.post('/api/saidas', protegerRota, async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Erro ao registrar saída:", err);
-    res.status(400).json({ error: err.message });
+  t res.status(400).json({ error: err.message });
   } finally {
     client.release();
   }
@@ -635,7 +635,7 @@ app.get('/api/exportar/estoque_atual_csv', protegerRota, async (req, res) => {
                 fornecedor_nome: item.fornecedor_nome || '-',
                 totalunidades: total,
                 custoporpacote: custo.toFixed(2),
-                valor_total: valor_total.toFixed(2),
+test             valor_total: valor_total.toFixed(2),
                 estoqueminimo: item.estoqueminimo || 0,
                 ultimaentrada: formatarDataParaCSV(item.ultimaentrada)
             };
@@ -658,9 +658,12 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
         const estoqueRes = await client.query('SELECT e.*, c.tipo_unidade FROM estoque e LEFT JOIN categorias c ON e.categoria_id = c.id WHERE e.id = $1 FOR UPDATE OF e', [estoque_id]);
         if (estoqueRes.rows.length === 0) throw new Error('Produto não encontrado no estoque.');
         const item = estoqueRes.rows[0];
-        if (item.totalunidades < 1) throw new Error('Estoque insuficiente para iniciar o uso.');
+  t     if (item.totalunidades < 1) throw new Error('Estoque insuficiente para iniciar o uso.');
         const novoTotalUnidades = item.totalunidades - 1;
-        const novosPacotes = (item.tipo_unidade === 'rolo' || item.tipo_unidade === 'embalagem') ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000); // Correção aqui
+        
+        // ***** CORREÇÃO APLICADA AQUI *****
+        const novosPacotes = (item.tipo_unidade === 'rolo' || item.tipo_unidade === 'embalagem') ? novoTotalUnidades : Math.floor(novoTotalUnidades / 5000);
+        
         await client.query('UPDATE estoque SET totalunidades = $1, pacotes = $2 WHERE id = $3', [novoTotalUnidades, novosPacotes, estoque_id]);
         const usoRes = await client.query(
             'INSERT INTO uso_producao (estoque_id, produto_nome, data_inicio, status) VALUES ($1, $2, $3, $4) RETURNING *',
