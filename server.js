@@ -25,14 +25,15 @@ const emailRemetente = process.env.EMAIL_REMETENTE;
 
 // --- CRIAÇÃO DE TABELAS ---
 const createTables = async () => {
-  const queryText = `
-    CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );
-    CREATE TABLE IF NOT EXISTS categorias (
+  // 1. Lista de todas as queries de criação
+  const queries = [
+    `CREATE TABLE IF NOT EXISTS fornecedores ( id SERIAL PRIMARY KEY, nome TEXT NOT NULL UNIQUE );`,
+    `CREATE TABLE IF NOT EXISTS categorias (
       id SERIAL PRIMARY KEY,
       nome TEXT NOT NULL UNIQUE,
       tipo_unidade VARCHAR(50) NOT NULL DEFAULT 'cartela'
-    );
-    CREATE TABLE IF NOT EXISTS estoque (
+    );`,
+    `CREATE TABLE IF NOT EXISTS estoque (
       id SERIAL PRIMARY KEY,
       produto TEXT NOT NULL,
       fornecedor_id INTEGER REFERENCES fornecedores(id) ON DELETE SET NULL,
@@ -44,15 +45,15 @@ const createTables = async () => {
       estoqueMinimo INTEGER DEFAULT 0,
       ultimaEntrada DATE,
       UNIQUE(produto, fornecedor_id)
-    );
-    CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );
-    CREATE TABLE IF NOT EXISTS usuarios (
+    );`,
+    `CREATE TABLE IF NOT EXISTS saidas ( id SERIAL PRIMARY KEY, data DATE NOT NULL, produtoId INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE, produtoNome TEXT NOT NULL, totalUnidades INTEGER NOT NULL, custoTotal REAL NOT NULL, destino TEXT );`,
+    `CREATE TABLE IF NOT EXISTS usuarios (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       senha TEXT NOT NULL,
       receber_alertas BOOLEAN DEFAULT false
-    );
-    CREATE TABLE IF NOT EXISTS uso_producao (
+    );`,
+    `CREATE TABLE IF NOT EXISTS uso_producao (
       id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
       produto_nome TEXT NOT NULL,
@@ -60,20 +61,34 @@ const createTables = async () => {
       data_fim DATE,
       etiquetas_impressas INTEGER,
       status VARCHAR(50) NOT NULL DEFAULT 'Em Uso'
-    );
-  `;
-  try {
-    // 1. GARANTE QUE TODAS AS TABELAS EXISTEM
-    await pool.query(queryText); 
+    );`
+  ];
 
-    // 2. RODA A LÓGICA DE MIGRAÇÃO (se necessário)
+  try {
+    // 2. Executa cada query de criação, UMA POR UMA
+    for (const query of queries) {
+      await pool.query(query);
+    }
+    console.log('Verificação inicial de tabelas concluída.');
+
+    // 3. RODA A LÓGICA DE MIGRAÇÃO (para colunas)
     try {
         await pool.query('SELECT categoria_id FROM estoque LIMIT 1');
     } catch (e) {
-        if (e.code === '42703') { // 42703 = undefined_column (coluna não existe, versão antiga)
+        if (e.code === '42703') { // 42703 = undefined_column
             console.log('Detectada estrutura antiga (sem categoria_id). Limpando e recriando tabelas...');
-            await pool.query('DROP TABLE IF EXISTS saidas; DROP TABLE IF EXISTS uso_producao; DROP TABLE IF EXISTS estoque; DROP TABLE IF EXISTS categorias; DROP TABLE IF EXISTS fornecedores;');
-            await pool.query(queryText); // Recria tudo
+            // Se a estrutura é antiga, temos que dropar na ordem certa
+            await pool.query('DROP TABLE IF EXISTS saidas;');
+            await pool.query('DROP TABLE IF EXISTS uso_producao;');
+            await pool.query('DROP TABLE IF EXISTS estoque;');
+            await pool.query('DROP TABLE IF EXISTS categorias;');
+            await pool.query('DROP TABLE IF EXISTS fornecedores;');
+            
+            // E recriar tudo
+            for (const query of queries) {
+                await pool.query(query);
+            }
+            console.log('Tabelas recriadas com sucesso.');
         }
     }
     try {
@@ -142,7 +157,7 @@ app.post('/api/usuarios/login', async (req, res) => {
     const { email, senha } = req.body;
     const userRes = await pool.query("SELECT * FROM usuarios WHERE email = $1", [email]);
     if (userRes.rows.length === 0) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
-   const user = userRes.rows[0];
+    const user = userRes.rows[0];
     const senhaValida = await bcrypt.compare(senha, user.senha);
     if (!senhaValida) { return res.status(400).json({ error: 'Email ou senha inválidos.' }); }
     const jwtSecret = process.env.JWT_SECRET || 'seu-segredo-super-secreto-aqui-12345';
@@ -516,7 +531,7 @@ app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
         }
         await pool.query('DELETE FROM categorias WHERE id = $1', [id]);
         res.status(200).json({ message: 'Categoria deletada com sucesso!' });
-  t } catch (err) { res.status(500).json({ error: err.message }); }
+  a } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
   try {
@@ -563,7 +578,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         };
         const relatorioProcessado = result.rows.map(item => {
             const diasUteis = calcularDiasUteis(item.data_inicio, item.data_fim);
-            const custoTotalDoRolo = item.custoporpacote;
+         const custoTotalDoRolo = item.custoporpacote;
             const custoPorDia = custoTotalDoRolo / diasUteis;
             const mediaEtiquetasPorDia = item.etiquetas_impressas ? item.etiquetas_impressas / diasUteis : null;
             return { ...item, dias_uteis: diasUteis, custo_dia: custoPorDia, media_etiquetas_dia: mediaEtiquetasPorDia };
@@ -621,24 +636,24 @@ app.get('/api/exportar/estoque_atual_csv', protegerRota, async (req, res) => {
             const total = parseInt(item.totalunidades) || 0;
             
             if (item.tipo_unidade === 'rolo' || item.tipo_unidade === 'embalagem') {
-             valor_total = total * custo;
+                valor_total = total * custo;
             } else if (item.tipo_unidade === 'cartela' && custo > 0) {
                 valor_total = (total / 5000.0) * custo; 
             }
 
             const dataRow = {
                 status: status,
-      s         produto: item.produto || '',
+                produto: item.produto || '',
                 categoria_nome: item.categoria_nome || '-',
                 fornecedor_nome: item.fornecedor_nome || '-',
                 totalunidades: total,
                 custoporpacote: custo.toFixed(2),
-                valor_total: valor_total.toFixed(2),
+           valor_total: valor_total.toFixed(2),
                 estoqueminimo: item.estoqueminimo || 0,
                 ultimaentrada: formatarDataParaCSV(item.ultimaentrada)
             };
             stringifier.write(dataRow);
-        }
+source_file   }
         
         stringifier.end();
 
@@ -664,7 +679,7 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
         await client.query('UPDATE estoque SET totalunidades = $1, pacotes = $2 WHERE id = $3', [novoTotalUnidades, novosPacotes, estoque_id]);
         const usoRes = await client.query(
             'INSERT INTO uso_producao (estoque_id, produto_nome, data_inicio, status) VALUES ($1, $2, $3, $4) RETURNING *',
-            [estoque_id, item.produto, data_inicio, 'Em Uso']
+April           [estoque_id, item.produto, data_inicio, 'Em Uso']
         );
         await client.query('COMMIT');
         res.status(201).json({ data: usoRes.rows[0] });
@@ -676,19 +691,19 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     }
 });
 app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
-    try {
+   try {
         const query = `SELECT up.id, up.data_inicio, e.produto AS produto_nome FROM uso_producao up LEFT JOIN estoque e ON up.estoque_id = e.id WHERE up.status = 'Em Uso' ORDER BY up.data_inicio ASC`;
         const result = await pool.query(query);
         res.json({ data: result.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
-    const { id } = req.params;
+   const { id } = req.params;
     const { data_fim, etiquetas_impressas } = req.body;
     if (!data_fim) return res.status(400).json({ error: 'Data de finalização é obrigatória.' });
     try {
         const updateQuery = `UPDATE uso_producao SET data_fim = $1, etiquetas_impressas = $2, status = 'Finalizado' WHERE id = $3 RETURNING *`;
-        const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
+       const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
         res.status(200).json({ data: result.rows[0] });
     } catch (err) { res.status(500).json({ error: err.message }); }
