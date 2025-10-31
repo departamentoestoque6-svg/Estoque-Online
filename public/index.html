@@ -215,6 +215,10 @@
                             <div class="form-group"><label for="filtroTexto">Buscar por Nome</label><input type="text" id="filtroTexto" onkeyup="renderizarEstoque()" placeholder="Digite o nome do produto..."></div>
                             <div class="form-group"><label for="filtroStatus">Filtrar por Status</label><select id="filtroStatus" onchange="renderizarEstoque()"><option value="todos">Todos</option><option value="ok">OK</option><option value="baixo">Baixo</option><option value="critico">Crítico</option></select></div>
                         </div>
+                        
+                        <button class="btn btn-success" style="margin-top: 10px;" onclick="exportarEstoqueCSV()">
+                            Exportar Posição Atual (CSV)
+                        </button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -229,18 +233,18 @@
                     </div>
                 </div>
                 <div id="aba-saida" class="tab-content">
-                     <div class="section">
+                    <div class="section">
                         <h3>Registrar Consumo Geral</h3>
                         <div class="form-row">
                             <div class="form-group"><label for="saidaProduto">Produto <span style="color: red;">*</span></label><select id="saidaProduto" onchange="ajustarCamposSaida()"></select></div>
                             <div class="form-group"><label for="saidaData">Data <span style="color: red;">*</span></label><input type="date" id="saidaData"></div>
                             <div class="form-group"><label for="saidaPacotes" id="labelSaidaPacotes">Pacotes</label><input type="number" id="saidaPacotes" value="0" min="0"></div>
                             <div class="form-group" id="groupSaidaUnidades"><label for="saidaUnidades">Unidades</label><input type="number" id="saidaUnidades" value="0" min="0"></div>
-                             <div class="form-group"><label for="saidaDestino">Destino/Motivo</label><input type="text" id="saidaDestino" placeholder="Ex: Perda, Uso diverso..."></div>
+                            <div class="form-group"><label for="saidaDestino">Destino/Motivo</label><input type="text" id="saidaDestino" placeholder="Ex: Perda, Uso diverso..."></div>
                         </div>
                         <button class="btn btn-success" onclick="registrarSaida()">Registrar Consumo</button>
                     </div>
-                     <div class="table-container">
+                    <div class="table-container">
                         <h3>Histórico de Consumo</h3>
                         <table>
                             <thead><tr><th>Data</th><th>Produto</th><th>Total (un)</th><th>Custo Total</th><th>Destino/Motivo</th></tr></thead>
@@ -279,7 +283,7 @@
                         <button id="btnFornecedoresProxima" onclick="mudarPagina('fornecedores', 1)">Próxima</button>
                     </div>
                 </div>
-                 <div id="aba-producao" class="tab-content">
+                <div id="aba-producao" class="tab-content">
                     <div class="section">
                         <h3>Iniciar Uso de Rolo em Produção</h3>
                         <div class="form-row">
@@ -309,6 +313,7 @@
                                 <select id="categoriaTipo">
                                     <option value="cartela">Cartela (Pacotes de 5000un)</option>
                                     <option value="rolo">Rolo (Unidade individual)</option>
+                                    <option value="embalagem">Embalagem</option>
                                 </select>
                             </div>
                             <div class="form-group" style="justify-content: flex-end;">
@@ -404,7 +409,7 @@
                 <div class="form-group"><label for="editFornecedorId">Fornecedor</label><select id="editFornecedorId"></select></div>
             </div>
             <div class="form-row">
-                 <div class="form-group"><label for="editCategoriaId">Categoria</label><select id="editCategoriaId" onchange="ajustarCamposProduto('edit')"></select></div>
+                <div class="form-group"><label for="editCategoriaId">Categoria</label><select id="editCategoriaId" onchange="ajustarCamposProduto('edit')"></select></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label for="editPacotes" id="labelEditPacotes">Pacotes</label><input type="number" id="editPacotes" min="0"></div>
@@ -464,6 +469,7 @@
                     <select id="editCategoriaTipo">
                         <option value="cartela">Cartela (Pacotes de 5000un)</option>
                         <option value="rolo">Rolo (Unidade individual)</option>
+                        <option value="embalagem">Embalagem</option>
                     </select>
                 </div>
             </div>
@@ -613,10 +619,23 @@
             const lblCusto = document.getElementById(prefix === 'estoque' ? 'labelCusto' : 'labelEditCusto');
             const grpUnidades = document.getElementById(prefix === 'estoque' ? 'groupUnidadesAvulsas' : 'groupEditUnidades');
             const inptUnidades = document.getElementById(prefix === 'estoque' ? 'estoqueUnidades' : 'editUnidades');
-            if (tipo === 'rolo') { lblPacotes.innerHTML = 'Qtd. de Rolos <span style="color: red;">*</span>'; lblCusto.innerHTML = 'Custo por Rolo (R$) <span style="color: red;">*</span>'; grpUnidades.style.display = 'none'; inptUnidades.value = 0; } 
-            else { lblPacotes.innerHTML = 'Pacotes <span style="color: red;">*</span>'; lblCusto.innerHTML = 'Custo/Pacote (R$) <span style="color: red;">*</span>'; grpUnidades.style.display = 'flex'; } 
+            
+            // LÓGICA ATUALIZADA PARA INCLUIR 'embalagem'
+            if (tipo === 'rolo' || tipo === 'embalagem') { 
+                const labelNome = tipo === 'rolo' ? 'Rolos' : 'Embalagens';
+                const custoNome = tipo === 'rolo' ? 'Rolo' : 'Embalagem';
+                lblPacotes.innerHTML = `Qtd. de ${labelNome} <span style="color: red;">*</span>`; 
+                lblCusto.innerHTML = `Custo por ${custoNome} (R$) <span style="color: red;">*</span>`; 
+                grpUnidades.style.display = 'none'; 
+                inptUnidades.value = 0; 
+            } 
+            else { // Assume 'cartela'
+                lblPacotes.innerHTML = 'Pacotes <span style="color: red;">*</span>'; 
+                lblCusto.innerHTML = 'Custo/Pacote (R$) <span style="color: red;">*</span>'; 
+                grpUnidades.style.display = 'flex'; 
+            } 
         }
-        async function adicionarEstoque(){ const selCat = document.getElementById('estoqueCategoriaId'); if (!selCat.value) return mostrarMensagem('Por favor, selecione uma categoria.', 'error'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('estoqueUnidades').value) || 0); const item = { produto: document.getElementById('estoqueProduto').value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesAvulsas: unidades, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || !item.categoria_id || (!item.pacotes && !item.unidadesAvulsas && tipo !== 'rolo') || (tipo === 'rolo' && !item.pacotes) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function adicionarEstoque(){ const selCat = document.getElementById('estoqueCategoriaId'); if (!selCat.value) return mostrarMensagem('Por favor, selecione uma categoria.', 'error'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('estoquePacotes').value) || 0; let unidades = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : (parseInt(document.getElementById('estoqueUnidades').value) || 0); const item = { produto: document.getElementById('estoqueProduto').value, fornecedor_id: document.getElementById('estoqueFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesAvulsas: unidades, custoPorPacote: parseFloat(document.getElementById('estoqueCusto').value), estoqueMinimo: parseInt(document.getElementById('estoqueMinimo').value) || 0, ultimaEntrada: document.getElementById('estoqueData').value }; if (!item.produto || !item.categoria_id || (!item.pacotes && !item.unidadesAvulsas && (tipo !== 'rolo' && tipo !== 'embalagem')) || ((tipo === 'rolo' || tipo === 'embalagem') && !item.pacotes) || !item.custoPorPacote) { return mostrarMensagem('Preencha os campos obrigatórios!', 'error'); } try { const res = await fetch(`${API_URL}/estoque`, { method: 'POST', headers: authHeaders, body: JSON.stringify(item) }); if (!res.ok) throw new Error('Falha ao adicionar ao estoque.'); mostrarMensagem('Estoque atualizado com sucesso!', 'success'); limparFormEstoque(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         function editarEstoque(index){ 
             const itemOriginal = estoque[index];
             const itemGlobal = todosOsProdutos.find(i => i.id === itemOriginal.id); 
@@ -630,11 +649,52 @@
             document.getElementById('editUnidades').value = itemGlobal.unidadesavulsas; 
             document.getElementById('editCusto').value = itemGlobal.custoporpacote; 
             document.getElementById('editMinimo').value = itemGlobal.estoqueminimo; 
-            document.getElementById('modalEdicao').style.display = 'block'; 
+            document.getElementById('modalEdicao').style.display = 'block';
         }
-        async function salvarEdicao(){ const id = document.getElementById('editId').value; const selCat = document.getElementById('editCategoriaId'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('editPacotes').value) || 0; let unidades = tipo === 'rolo' ? 0 : (parseInt(document.getElementById('editUnidades').value) || 0); const dados = { fornecedor_id: document.getElementById('editFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesavulsas: unidades, custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0, estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0 }; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(dados) }); if (!res.ok) throw new Error('Falha ao salvar as alterações.'); mostrarMensagem('Item atualizado com sucesso!', 'success'); fecharModal(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
+        async function salvarEdicao(){ const id = document.getElementById('editId').value; const selCat = document.getElementById('editCategoriaId'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('editPacotes').value) || 0; let unidades = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : (parseInt(document.getElementById('editUnidades').value) || 0); const dados = { fornecedor_id: document.getElementById('editFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesavulsas: unidades, custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0, estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0 }; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(dados) }); if (!res.ok) throw new Error('Falha ao salvar as alterações.'); mostrarMensagem('Item atualizado com sucesso!', 'success'); fecharModal(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function excluirEstoque(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE', headers: authHeaders }); if (!res.ok) throw new Error('Falha ao deletar o item.'); mostrarMensagem('Item deletado com sucesso!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
+        async function exportarEstoqueCSV() {
+            document.getElementById('saveStatus').textContent = 'Exportando CSV...';
+            try {
+                const res = await fetch(`${API_URL}/exportar/estoque_atual_csv`, {
+                    method: 'GET',
+                    headers: authHeaders // ESSENCIAL: Enviar o token de autenticação
+                });
+
+                if (res.status === 401 || res.status === 403) {
+                    return fazerLogout();
+                }
+                if (!res.ok) {
+                    throw new Error('Falha ao gerar o arquivo CSV no servidor.');
+                }
+
+                // 1. Obter os dados como um "blob" (um arquivo binário)
+                const blob = await res.blob();
+                
+                // 2. Criar um link temporário na memória
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'posicao_estoque_atual.csv'; // Nome do arquivo
+
+                // 3. Adicionar o link ao corpo, clicar nele e removê-lo
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                document.getElementById('saveStatus').textContent = 'Pronto';
+                mostrarMensagem('Relatório CSV baixado com sucesso!', 'success');
+
+            } catch (e) {
+                console.error('Erro ao exportar CSV:', e);
+                mostrarMensagem(e.message, 'error');
+                document.getElementById('saveStatus').textContent = 'Erro';
+            }
+        }
+
         // --- FUNÇÕES DE SAÍDA ---
         async function registrarSaida(){
             const pId = parseInt(document.getElementById('saidaProduto').value);
@@ -643,11 +703,14 @@
             const cat = categorias.find(c => c.id === itemEstoque.categoria_id);
             const tipo = cat ? cat.tipo_unidade : 'cartela';
             let total;
-            if(tipo === 'rolo') {
+            
+            // LÓGICA ATUALIZADA PARA INCLUIR 'embalagem'
+            if(tipo === 'rolo' || tipo === 'embalagem') {
                 total = parseInt(document.getElementById('saidaPacotes').value) || 0;
-            } else {
+            } else { // Assume 'cartela'
                 total = (parseInt(document.getElementById('saidaPacotes').value) || 0) * UN_POR_PACOTE + (parseInt(document.getElementById('saidaUnidades').value) || 0);
             }
+            
             if (!pId || !document.getElementById('saidaData').value || total === 0) {
                 return mostrarMensagem('Preencha Produto, Data e Quantidade!', 'error');
             }
@@ -783,8 +846,16 @@
             const tipo = cat ? cat.tipo_unidade : 'cartela';
             const lblPacotes = document.getElementById('labelSaidaPacotes');
             const grpUnidades = document.getElementById('groupSaidaUnidades');
-            if (tipo === 'rolo') { lblPacotes.textContent = 'Quantidade (Rolos)'; grpUnidades.style.display = 'none'; } 
-            else { lblPacotes.textContent = 'Pacotes'; grpUnidades.style.display = 'block'; }
+            
+            // LÓGICA ATUALIZADA PARA INCLUIR 'embalagem'
+            if (tipo === 'rolo' || tipo === 'embalagem') { 
+                lblPacotes.textContent = 'Quantidade'; 
+                grpUnidades.style.display = 'none';
+            } 
+            else { // Assume 'cartela'
+                lblPacotes.textContent = 'Pacotes'; 
+                grpUnidades.style.display = 'block'; 
+            }
         }
         
         function limparFormEstoque(){ document.getElementById('estoqueProduto').value = ''; document.getElementById('estoqueFornecedorId').value = ''; document.getElementById('estoqueCategoriaId').value = ''; document.getElementById('estoquePacotes').value = '0'; document.getElementById('estoqueUnidades').value = '0'; document.getElementById('estoqueCusto').value = ''; document.getElementById('estoqueMinimo').value = ''; document.getElementById('estoqueData').value = new Date().toISOString().split('T')[0]; ajustarCamposProduto(); }
@@ -850,6 +921,8 @@
         window.abrirModalEditarCategoria = abrirModalEditarCategoria;
         window.fecharModalEditarCategoria = fecharModalEditarCategoria;
         window.salvarEdicaoCategoria = salvarEdicaoCategoria;
+
+        window.exportarEstoqueCSV = exportarEstoqueCSV; 
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>
