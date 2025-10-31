@@ -216,10 +216,7 @@
                             <div class="form-group"><label for="filtroStatus">Filtrar por Status</label><select id="filtroStatus" onchange="renderizarEstoque()"><option value="todos">Todos</option><option value="ok">OK</option><option value="baixo">Baixo</option><option value="critico">Crítico</option></select></div>
                         </div>
                         
-                        <button class="btn btn-success" style="margin-top: 10px;" onclick="exportarEstoqueCSV()">
-                            Exportar Posição Atual (CSV)
-                        </button>
-                    </div>
+                        </div>
                     <div class="table-container">
                         <table>
                             <thead><tr><th class="sortable" onclick="ordenarPor('acoes')">Ações</th><th class="sortable" onclick="ordenarPor('status')">Status <span id="arrow-status" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('produto')">Produto <span id="arrow-produto" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('categoria_nome')">Categoria <span id="arrow-categoria_nome" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('fornecedor_nome')">Fornecedor <span id="arrow-fornecedor_nome" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('totalunidades')">Total (un) <span id="arrow-totalunidades" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('custoporpacote')">Custo/Pacote <span id="arrow-custoporpacote" class="sort-arrow"></span></th><th class="sortable" onclick="ordenarPor('ultimaentrada')">Última Entrada <span id="arrow-ultimaentrada" class="sort-arrow"></span></th></tr></thead>
@@ -654,46 +651,7 @@
         async function salvarEdicao(){ const id = document.getElementById('editId').value; const selCat = document.getElementById('editCategoriaId'); const tipo = selCat.options[selCat.selectedIndex].dataset.tipo; let pacotes = parseInt(document.getElementById('editPacotes').value) || 0; let unidades = (tipo === 'rolo' || tipo === 'embalagem') ? 0 : (parseInt(document.getElementById('editUnidades').value) || 0); const dados = { fornecedor_id: document.getElementById('editFornecedorId').value || null, categoria_id: selCat.value, pacotes: pacotes, unidadesavulsas: unidades, custoporpacote: parseFloat(document.getElementById('editCusto').value) || 0, estoqueminimo: parseInt(document.getElementById('editMinimo').value) || 0 }; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(dados) }); if (!res.ok) throw new Error('Falha ao salvar as alterações.'); mostrarMensagem('Item atualizado com sucesso!', 'success'); fecharModal(); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         async function excluirEstoque(id){ if (!confirm('Tem certeza?')) return; try { const res = await fetch(`${API_URL}/estoque/${id}`, { method: 'DELETE', headers: authHeaders }); if (!res.ok) throw new Error('Falha ao deletar o item.'); mostrarMensagem('Item deletado com sucesso!', 'success'); await carregarDados(); } catch (e) { mostrarMensagem(e.message, 'error'); } }
         
-        async function exportarEstoqueCSV() {
-            document.getElementById('saveStatus').textContent = 'Exportando CSV...';
-            try {
-                const res = await fetch(`${API_URL}/exportar/estoque_atual_csv`, {
-                    method: 'GET',
-                    headers: authHeaders // ESSENCIAL: Enviar o token de autenticação
-                });
-
-                if (res.status === 401 || res.status === 403) {
-                    return fazerLogout();
-                }
-                if (!res.ok) {
-                    throw new Error('Falha ao gerar o arquivo CSV no servidor.');
-                }
-
-                // 1. Obter os dados como um "blob" (um arquivo binário)
-                const blob = await res.blob();
-                
-                // 2. Criar um link temporário na memória
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'posicao_estoque_atual.csv'; // Nome do arquivo
-
-                // 3. Adicionar o link ao corpo, clicar nele e removê-lo
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-
-                document.getElementById('saveStatus').textContent = 'Pronto';
-                mostrarMensagem('Relatório CSV baixado com sucesso!', 'success');
-
-            } catch (e) {
-                console.error('Erro ao exportar CSV:', e);
-                mostrarMensagem(e.message, 'error');
-                document.getElementById('saveStatus').textContent = 'Erro';
-            }
-        }
+        // --- FUNÇÃO DE EXPORTAÇÃO CSV REMOVIDA ---
 
         // --- FUNÇÕES DE SAÍDA ---
         async function registrarSaida(){
@@ -922,7 +880,7 @@
         window.fecharModalEditarCategoria = fecharModalEditarCategoria;
         window.salvarEdicaoCategoria = salvarEdicaoCategoria;
 
-        window.exportarEstoqueCSV = exportarEstoqueCSV; 
+        // --- LINHA DE EXPORTAÇÃO CSV REMOVIDA ---
 
         document.addEventListener('DOMContentLoaded', inicializar);
     </script>

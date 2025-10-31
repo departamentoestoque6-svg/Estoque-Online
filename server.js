@@ -519,7 +519,7 @@ app.delete('/api/categorias/:id', protegerRota, async (req, res) => {
         }
         await pool.query('DELETE FROM categorias WHERE id = $1', [id]);
         res.status(200).json({ message: 'Categoria deletada com sucesso!' });
-  D } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/relatorios/valor-por-produto', protegerRota, async (req, res) => {
   try {
@@ -559,7 +559,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
             let dias = 0; let dataAtual = new Date(inicio); const dataFim = new Date(fim);
             while (dataAtual <= dataFim) {
                 const diaDaSemana = dataAtual.getUTCDay();
-           if (diaDaSemana !== 0) { dias++; }
+                if (diaDaSemana !== 0) { dias++; }
                 dataAtual.setUTCDate(dataAtual.getUTCDate() + 1);
             }
             return dias > 0 ? dias : 1;
@@ -575,7 +575,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ***** ROTA DE EXPORTAÇÃO CSV (REMOVIDA) *****
+// ***** ROTA DE EXPORTAÇÃO CSV FOI REMOVIDA *****
 
 app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     const { estoque_id, data_inicio } = req.body;
@@ -601,7 +601,7 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
         await client.query('ROLLBACK');
         res.status(400).json({ error: err.message });
     } finally {
-     client.release();
+        client.release();
     }
 });
 app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
@@ -612,14 +612,14 @@ app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
-   const { id } = req.params;
+    const { id } = req.params;
     const { data_fim, etiquetas_impressas } = req.body;
     if (!data_fim) return res.status(400).json({ error: 'Data de finalização é obrigatória.' });
     try {
         const updateQuery = `UPDATE uso_producao SET data_fim = $1, etiquetas_impressas = $2, status = 'Finalizado' WHERE id = $3 RETURNING *`;
         const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
-       res.status(200).json({ data: result.rows[0] });
+        res.status(200).json({ data: result.rows[0] });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
