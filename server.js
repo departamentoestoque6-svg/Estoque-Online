@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% LIMPA E CORRIGIDA (Bug "Embalagem" + Bug "createTables" + Sem Lixo)
+// server.js - VERSÃO 100% LIMPA E CORRIGIDA (Bug "createTables" + Bug "Embalagem" + Sem Lixo)
 
 require('dotenv').config();
 const express = require('express');
