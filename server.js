@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% LIMPA E CORRIGIDA (Bug "createTables" + Bug "Embalagem" + Sem Lixo)
+// server.js - VERSÃO 100% LIMPA (SEM CSV) E CORRIGIDA (Bugs "Embalagem" e "createTables")
 
 require('dotenv').config();
 const express = require('express');
@@ -615,7 +615,7 @@ app.put('/api/producao/finalizar/:id', protegerRota, async (req, res) => {
     if (!data_fim) return res.status(400).json({ error: 'Data de finalização é obrigatória.' });
     try {
         const updateQuery = `UPDATE uso_producao SET data_fim = $1, etiquetas_impressas = $2, status = 'Finalizado' WHERE id = $3 RETURNING *`;
-        const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
+i       const result = await pool.query(updateQuery, [data_fim, etiquetas_impressas || null, id]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Registro de uso não encontrado.' }); }
         res.status(200).json({ data: result.rows[0] });
     } catch (err) { res.status(500).json({ error: err.message }); }
