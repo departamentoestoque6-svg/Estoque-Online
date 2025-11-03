@@ -575,7 +575,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ***** ROTA DE EXPORTAÇÃO CSV FOI REMOVIDA *****
+// ***** ROTA DE EXPORTAÇÃO CSV (REMOVIDA) *****
 
 app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
     const { estoque_id, data_inicio } = req.body;
