@@ -1,4 +1,4 @@
-// server.js - VERSÃO 100% LIMPA (SEM CSV) E CORRIGIDA (Bugs "Embalagem" e "createTables")
+// server.js - VERSÃO 100% LIMPA E CORRIGIDA
 
 require('dotenv').config();
 const express = require('express');
@@ -566,7 +566,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         };
         const relatorioProcessado = result.rows.map(item => {
             const diasUteis = calcularDiasUteis(item.data_inicio, item.data_fim);
-            const custoTotalDoRolo = item.custoporpacote;
+         const custoTotalDoRolo = item.custoporpacote;
             const custoPorDia = custoTotalDoRolo / diasUteis;
             const mediaEtiquetasPorDia = item.etiquetas_impressas ? item.etiquetas_impressas / diasUteis : null;
             return { ...item, dias_uteis: diasUteis, custo_dia: custoPorDia, media_etiquetas_dia: mediaEtiquetasPorDia };
@@ -599,7 +599,7 @@ app.post('/api/producao/iniciar', protegerRota, async (req, res) => {
         await client.query('ROLLBACK');
         res.status(400).json({ error: err.message });
     } finally {
-        client.release();
+     client.release();
     }
 });
 app.get('/api/producao/em-uso', protegerRota, async (req, res) => {
