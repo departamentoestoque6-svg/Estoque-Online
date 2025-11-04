@@ -53,7 +53,7 @@ const createTables = async () => {
       receber_alertas BOOLEAN DEFAULT false
     );`,
     `CREATE TABLE IF NOT EXISTS uso_producao (
-      id SERIAL PRIMARY KEY,
+  g     id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
       produto_nome TEXT NOT NULL,
       data_inicio DATE NOT NULL,
