@@ -64,7 +64,7 @@ const createTables = async () => {
   ];
 
   try {
-    // 2. Executa cada query de criação, UMA POR UMA (CORREÇÃO DO ERRO 42601)
+    // 2. Executa cada query de criação, UMA POR UMA (ESTA É A CORREÇÃO)
     for (const query of queries) {
       await pool.query(query);
     }
