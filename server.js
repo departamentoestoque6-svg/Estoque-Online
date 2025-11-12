@@ -53,7 +53,7 @@ const createTables = async () => {
       receber_alertas BOOLEAN DEFAULT false
     );`,
     `CREATE TABLE IF NOT EXISTS uso_producao (
-  g     id SERIAL PRIMARY KEY,
+      id SERIAL PRIMARY KEY,
       estoque_id INTEGER NOT NULL REFERENCES estoque(id) ON DELETE CASCADE,
       produto_nome TEXT NOT NULL,
       data_inicio DATE NOT NULL,
@@ -64,7 +64,7 @@ const createTables = async () => {
   ];
 
   try {
-    // 2. Executa cada query de criação, UMA POR UMA (ESTA É A CORREÇÃO)
+    // 2. Executa cada query de criação, UMA POR UMA (CORREÇÃO DO ERRO 42601)
     for (const query of queries) {
       await pool.query(query);
     }
@@ -566,7 +566,7 @@ app.get('/api/relatorios/historico-uso', protegerRota, async (req, res) => {
         };
         const relatorioProcessado = result.rows.map(item => {
             const diasUteis = calcularDiasUteis(item.data_inicio, item.data_fim);
-            const custoTotalDoRolo = item.custoporpacote;
+         const custoTotalDoRolo = item.custoporpacote;
             const custoPorDia = custoTotalDoRolo / diasUteis;
             const mediaEtiquetasPorDia = item.etiquetas_impressas ? item.etiquetas_impressas / diasUteis : null;
             return { ...item, dias_uteis: diasUteis, custo_dia: custoPorDia, media_etiquetas_dia: mediaEtiquetasPorDia };
